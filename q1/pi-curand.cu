@@ -16,14 +16,14 @@
 #define TRIALS_PER_THREAD 4096
 #define BLOCKS 256
 #define THREADS 256
-#define PI 3.1415926535  // known value of pi
 
 //Help code for switching between Single Precision and Double Precision
-
 #ifdef DP
-typedef double Real;
+	typedef double Real;
+	#define PI  3.14159265358979323846  // known value of pi
 #else
-typedef float Real;
+	typedef float Real;
+	#define PI 3.1415926535  // known value of pi
 #endif
 
 
@@ -38,6 +38,7 @@ Real randNumGen(){
    return unit_random;
 }
 
+//struct for parameter passing between pthread calls
 struct pthread_arg_struct {
     int tid;
     int total_threads;
@@ -52,14 +53,10 @@ void *doCalcs(void *arguments)
 	struct pthread_arg_struct *args = (struct pthread_arg_struct *)arguments;
 
 	int total_threads = args -> total_threads;
-	// printf("total_threads%d\n", total_threads);
-   // long longTid;
-   // longTid = (long)threadid;
-   
-   // int tid = (int)longTid;       //obtain the integer value of thread id
+	
 
-   int tid = args -> tid;       //obtain the integer value of thread id
-   printf("tid %d\n", tid);
+   int tid = args -> tid;       //obtain the value of thread id
+   // printf("tid %d\n", tid);
 
    //using malloc for the return variable in order make
    //sure that it is not destroyed once the thread call is finished
@@ -139,10 +136,8 @@ Real host_monte_carlo(long trials) {
 int main (int argc, char *argv[]) {
 	clock_t start, stop;
 
+	//get the total number of pthreads
 	int total_threads=atoi(argv[1]);
-
-
-
 
 	pthread_t threads[total_threads];
    	int rc;
@@ -176,48 +171,81 @@ BLOCKS, THREADS);
 
 	stop = clock();
 
-	printf("GPU pi calculated in %lf s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+	#ifdef DP
+		printf("GPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+
+	#else
+		printf("GPU pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+
+	#endif
+	
 
 	// PThreads
 	for(t=0;t<total_threads;t++){
 		struct pthread_arg_struct* args=(struct pthread_arg_struct*)malloc(sizeof *args);
 		args->total_threads=total_threads;
 		args->tid=t;
-		// printf("main-%d\n",args->tid);
-     rc = pthread_create(&threads[t], NULL, doCalcs, (void *)args);
-     if (rc){
-       printf("ERROR; return code from pthread_create() is %d\n", rc);
-       exit(-1);
-       }
-     }
+     	rc = pthread_create(&threads[t], NULL, doCalcs, (void *)args);
+     	if (rc){
+       		printf("ERROR; return code from pthread_create() is %d\n", rc);
+       		exit(-1);
+       	}
+    }
 
-   //join the threads
-   for(t=0;t<total_threads;t++){
+  	//join the threads
+   	for(t=0;t<total_threads;t++){
            
-      pthread_join(threads[t], &status);
-      //printf("Return from thread %ld is : %f\n",t, *(Real*)status);
-      
-      tot_in+=*(Real*)status;            //keep track of the total in count
+      	pthread_join(threads[t], &status);
+	    tot_in+=*(Real*)status;            //keep track of the total in count
      
      }
      
    Real pthread_pi=4*(tot_in/TOT_COUNT);
-   
-
    //End of PThreads 
 	
 
 	start = clock();
-	// Real pi_cpu = host_monte_carlo(BLOCKS * THREADS * TRIALS_PER_THREAD);
+	Real pi_cpu = host_monte_carlo(BLOCKS * THREADS * TRIALS_PER_THREAD);
 	stop = clock();
-	printf("CPU pi calculated in %lf s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+
+	#ifdef DP
+		printf("CPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+
+	#else
+		printf("CPU pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+
+	#endif
 
 	// printf("CUDA estimate of PI = %f [error of %f]\n", pi_gpu, pi_gpu - PI);
-	// printf("CPU estimate of PI = %f [error of %f]\n", pi_cpu, pi_cpu - PI);
-	printf("PThread estimate of PI = %lf [error of %f]\n",pthread_pi,pthread_pi - PI);
+	
+	#ifdef DP
+		// printf("CUDA estimate of PI = %20.18f [error of %20.18f]\n", pi_gpu, pi_gpu - PI);
+		printf("CPU estimate of PI = %20.18f [error of %20.18f]\n", pi_cpu, pi_cpu - PI);
+		printf("PThread estimate of PI = %20.18f [error of %20.18f]\n",pthread_pi,pthread_pi - PI);
+
+	#else
+		// printf("CUDA estimate of PI = %f [error of %f]\n", pi_gpu, pi_gpu - PI);
+		printf("CPU estimate of PI = %f [error of %f]\n", pi_cpu, pi_cpu - PI);
+		printf("PThread estimate of PI = %f [error of %f]\n",pthread_pi,pthread_pi - PI);
+
+	#endif
 	// return 0;
 	// 
 	/* Last thing that main() should do */
    pthread_exit(NULL);
 }
 
+/**
+ * Prints the difference between two given times
+ * @param start  start time
+ * @param finish end time
+ */
+// void print_time_difference(clock_t start,clock_t finish){
+// 	#ifdef DP
+// 		printf("GPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+
+// 	#else
+// 		printf("GPU pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+
+// 	#endif
+// }
