@@ -18,15 +18,23 @@
 #define THREADS 256
 #define PI 3.1415926535  // known value of pi
 
+//Help code for switching between Single Precision and Double Precision
+
+#ifdef DP
+typedef double Real;
+#else
+typedef float Real;
+#endif
+
 
 /**
 A random number generator. 
 Guidance from from http://stackoverflow.com/a/3067387/1281089
 **/
-float randNumGen(){
+Real randNumGen(){
 
    int random_value = rand(); //Generate a random number   
-   float unit_random = random_value / (float) RAND_MAX; //make it between 0 and 1 
+   Real unit_random = random_value / (Real) RAND_MAX; //make it between 0 and 1 
    return unit_random;
 }
 
@@ -55,20 +63,20 @@ void *doCalcs(void *arguments)
 
    //using malloc for the return variable in order make
    //sure that it is not destroyed once the thread call is finished
-   float *in_count = (float *)malloc(sizeof(float));
+   Real *in_count = (Real *)malloc(sizeof(Real));
    *in_count=0;
    
    //get the total number of iterations for a thread
-   float tot_iterations= TOT_COUNT/total_threads;
+   Real tot_iterations= TOT_COUNT/total_threads;
    
    int counter=0;
    
    //calculation
    for(counter=0;counter<tot_iterations;counter++){
-      float x = randNumGen();
-      float y = randNumGen();
+      Real x = randNumGen();
+      Real y = randNumGen();
       
-      float result = sqrt((x*x) + (y*y));
+      Real result = sqrt((x*x) + (y*y));
       
       if(result<1){
          *in_count+=1;         //check if the generated value is inside a unit circle
@@ -78,13 +86,13 @@ void *doCalcs(void *arguments)
    
    //get the remaining iterations calculated by thread 0
    if(tid==0){
-      float remainder = TOT_COUNT%total_threads;
+      Real remainder = TOT_COUNT%total_threads;
       
       for(counter=0;counter<remainder;counter++){
-      float x = randNumGen();
-      float y = randNumGen();
+      Real x = randNumGen();
+      Real y = randNumGen();
       
-      float result = sqrt((x*x) + (y*y));
+      Real result = sqrt((x*x) + (y*y));
       
       if(result<1){
          *in_count+=1;         //check if the generated value is inside a unit circle
@@ -101,10 +109,10 @@ void *doCalcs(void *arguments)
 
 
 
-__global__ void gpu_monte_carlo(float *estimate, curandState *states) {
+__global__ void gpu_monte_carlo(Real *estimate, curandState *states) {
 	unsigned int tid = threadIdx.x + blockDim.x * blockIdx.x;
 	int points_in_circle = 0;
-	float x, y;
+	Real x, y;
 
 	curand_init(1234, tid, 0, &states[tid]);  // 	Initialize CURAND
 
@@ -114,15 +122,15 @@ __global__ void gpu_monte_carlo(float *estimate, curandState *states) {
 		y = curand_uniform (&states[tid]);
 		points_in_circle += (x*x + y*y <= 1.0f); // count if x & y is in the circle.
 	}
-	estimate[tid] = 4.0f * points_in_circle / (float) TRIALS_PER_THREAD; // return estimate of pi
+	estimate[tid] = 4.0f * points_in_circle / (Real) TRIALS_PER_THREAD; // return estimate of pi
 }
 
-float host_monte_carlo(long trials) {
-	float x, y;
+Real host_monte_carlo(long trials) {
+	Real x, y;
 	long points_in_circle;
 	for(long i = 0; i < trials; i++) {
-		x = rand() / (float) RAND_MAX;
-		y = rand() / (float) RAND_MAX;
+		x = rand() / (Real) RAND_MAX;
+		y = rand() / (Real) RAND_MAX;
 		points_in_circle += (x*x + y*y <= 1.0f);
 	}
 	return 4.0f * points_in_circle / trials;
@@ -140,10 +148,10 @@ int main (int argc, char *argv[]) {
    	int rc;
    	long t;
    	void *status;
-   	float tot_in=0;
+   	Real tot_in=0;
 
-	// float host[BLOCKS * THREADS];
-	// float *dev;
+	// Real host[BLOCKS * THREADS];
+	// Real *dev;
 	// curandState *devStates;
 
 	printf("# of trials per thread = %d, # of blocks = %d, # of threads/block = %d.\n", TRIALS_PER_THREAD,
@@ -151,15 +159,15 @@ BLOCKS, THREADS);
 
 	start = clock();
 
-	// cudaMalloc((void **) &dev, BLOCKS * THREADS * sizeof(float)); // allocate device mem. for counts
+	// cudaMalloc((void **) &dev, BLOCKS * THREADS * sizeof(Real)); // allocate device mem. for counts
 	
 	// cudaMalloc( (void **)&devStates, THREADS * BLOCKS * sizeof(curandState) );
 
 	// gpu_monte_carlo<<<BLOCKS, THREADS>>>(dev, devStates);
 
-	// cudaMemcpy(host, dev, BLOCKS * THREADS * sizeof(float), cudaMemcpyDeviceToHost); // return results 
+	// cudaMemcpy(host, dev, BLOCKS * THREADS * sizeof(Real), cudaMemcpyDeviceToHost); // return results 
 
-	// float pi_gpu;
+	// Real pi_gpu;
 	// for(int i = 0; i < BLOCKS * THREADS; i++) {
 	// 	pi_gpu += host[i];
 	// }
@@ -168,7 +176,7 @@ BLOCKS, THREADS);
 
 	stop = clock();
 
-	printf("GPU pi calculated in %f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
+	printf("GPU pi calculated in %lf s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
 
 	// PThreads
 	for(t=0;t<total_threads;t++){
@@ -187,26 +195,26 @@ BLOCKS, THREADS);
    for(t=0;t<total_threads;t++){
            
       pthread_join(threads[t], &status);
-      //printf("Return from thread %ld is : %f\n",t, *(float*)status);
+      //printf("Return from thread %ld is : %f\n",t, *(Real*)status);
       
-      tot_in+=*(float*)status;            //keep track of the total in count
+      tot_in+=*(Real*)status;            //keep track of the total in count
      
      }
      
-   float pthread_pi=4*(tot_in/TOT_COUNT);
+   Real pthread_pi=4*(tot_in/TOT_COUNT);
    
 
    //End of PThreads 
 	
 
 	start = clock();
-	// float pi_cpu = host_monte_carlo(BLOCKS * THREADS * TRIALS_PER_THREAD);
+	// Real pi_cpu = host_monte_carlo(BLOCKS * THREADS * TRIALS_PER_THREAD);
 	stop = clock();
-	printf("CPU pi calculated in %f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
+	printf("CPU pi calculated in %lf s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
 
 	// printf("CUDA estimate of PI = %f [error of %f]\n", pi_gpu, pi_gpu - PI);
 	// printf("CPU estimate of PI = %f [error of %f]\n", pi_cpu, pi_cpu - PI);
-	printf("PThread estimate of PI = %f [error of %f]\n",pthread_pi,pthread_pi - PI);
+	printf("PThread estimate of PI = %lf [error of %f]\n",pthread_pi,pthread_pi - PI);
 	// return 0;
 	// 
 	/* Last thing that main() should do */
