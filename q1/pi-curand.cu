@@ -30,15 +30,28 @@ float randNumGen(){
    return unit_random;
 }
 
+struct pthread_arg_struct {
+    int tid;
+    int total_threads;
+};
+
+
 /**
 The task allocated to a thread
 **/
-void *doCalcs(void *threadid)
+void *doCalcs(void *arguments)
 {
-   long longTid;
-   longTid = (long)threadid;
+	struct pthread_arg_struct *args = (struct pthread_arg_struct *)arguments;
+
+	int total_threads = args -> total_threads;
+	// printf("total_threads%d\n", total_threads);
+   // long longTid;
+   // longTid = (long)threadid;
    
-   int tid = (int)longTid;       //obtain the integer value of thread id
+   // int tid = (int)longTid;       //obtain the integer value of thread id
+
+   int tid = args -> tid;       //obtain the integer value of thread id
+   printf("tid %d\n", tid);
 
    //using malloc for the return variable in order make
    //sure that it is not destroyed once the thread call is finished
@@ -46,7 +59,7 @@ void *doCalcs(void *threadid)
    *in_count=0;
    
    //get the total number of iterations for a thread
-   float tot_iterations= TOT_COUNT/NUM_THREADS;
+   float tot_iterations= TOT_COUNT/total_threads;
    
    int counter=0;
    
@@ -65,7 +78,7 @@ void *doCalcs(void *threadid)
    
    //get the remaining iterations calculated by thread 0
    if(tid==0){
-      float remainder = TOT_COUNT%NUM_THREADS;
+      float remainder = TOT_COUNT%total_threads;
       
       for(counter=0;counter<remainder;counter++){
       float x = randNumGen();
@@ -118,7 +131,12 @@ float host_monte_carlo(long trials) {
 int main (int argc, char *argv[]) {
 	clock_t start, stop;
 
-	pthread_t threads[NUM_THREADS];
+	int total_threads=atoi(argv[1]);
+
+
+
+
+	pthread_t threads[total_threads];
    	int rc;
    	long t;
    	void *status;
@@ -153,8 +171,12 @@ BLOCKS, THREADS);
 	printf("GPU pi calculated in %f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
 
 	// PThreads
-	for(t=0;t<NUM_THREADS;t++){
-     rc = pthread_create(&threads[t], NULL, doCalcs, (void *)t);
+	for(t=0;t<total_threads;t++){
+		struct pthread_arg_struct* args=(struct pthread_arg_struct*)malloc(sizeof *args);
+		args->total_threads=total_threads;
+		args->tid=t;
+		// printf("main-%d\n",args->tid);
+     rc = pthread_create(&threads[t], NULL, doCalcs, (void *)args);
      if (rc){
        printf("ERROR; return code from pthread_create() is %d\n", rc);
        exit(-1);
@@ -162,7 +184,7 @@ BLOCKS, THREADS);
      }
 
    //join the threads
-   for(t=0;t<NUM_THREADS;t++){
+   for(t=0;t<total_threads;t++){
            
       pthread_join(threads[t], &status);
       //printf("Return from thread %ld is : %f\n",t, *(float*)status);
@@ -178,12 +200,12 @@ BLOCKS, THREADS);
 	
 
 	start = clock();
-	float pi_cpu = host_monte_carlo(BLOCKS * THREADS * TRIALS_PER_THREAD);
+	// float pi_cpu = host_monte_carlo(BLOCKS * THREADS * TRIALS_PER_THREAD);
 	stop = clock();
 	printf("CPU pi calculated in %f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
 
 	// printf("CUDA estimate of PI = %f [error of %f]\n", pi_gpu, pi_gpu - PI);
-	printf("CPU estimate of PI = %f [error of %f]\n", pi_cpu, pi_cpu - PI);
+	// printf("CPU estimate of PI = %f [error of %f]\n", pi_cpu, pi_cpu - PI);
 	printf("PThread estimate of PI = %f [error of %f]\n",pthread_pi,pthread_pi - PI);
 	// return 0;
 	// 
