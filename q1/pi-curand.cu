@@ -86,8 +86,8 @@ void *doCalcs(void *arguments)
       Real remainder = total_tasks%total_threads;
       
       for(counter=0;counter<remainder;counter++){
-      Real x = randNumGen();
-      Real y = randNumGen();
+      Real x = rand_r((unsigned int*) &tid) / (Real) RAND_MAX;
+      Real y = rand_r((unsigned int*) &tid) / (Real) RAND_MAX;
       
       Real result = sqrt((x*x) + (y*y));
       
@@ -100,7 +100,7 @@ void *doCalcs(void *arguments)
 
 
    //printf("In count from #%d : %f\n",tid,*in_count);
-   
+   printf("exit %d\n",tid );
    pthread_exit((void *)in_count);     //return the in count
 }
 
@@ -146,29 +146,29 @@ int main (int argc, char *argv[]) {
    	long tot_in=0;
    	long total_tasks=BLOCKS*THREADS*TRIALS_PER_THREAD;
 
-	// Real host[BLOCKS * THREADS];
-	// Real *dev;
-	// curandState *devStates;
+	Real host[BLOCKS * THREADS];
+	Real *dev;
+	curandState *devStates;
 
 	printf("# of trials per thread = %d, # of blocks = %d, # of threads/block = %d.\n", TRIALS_PER_THREAD,
 BLOCKS, THREADS);
 
 	start = clock();
 
-	// cudaMalloc((void **) &dev, BLOCKS * THREADS * sizeof(Real)); // allocate device mem. for counts
+	cudaMalloc((void **) &dev, BLOCKS * THREADS * sizeof(Real)); // allocate device mem. for counts
 	
-	// cudaMalloc( (void **)&devStates, THREADS * BLOCKS * sizeof(curandState) );
+	cudaMalloc( (void **)&devStates, THREADS * BLOCKS * sizeof(curandState) );
 
-	// gpu_monte_carlo<<<BLOCKS, THREADS>>>(dev, devStates);
+	gpu_monte_carlo<<<BLOCKS, THREADS>>>(dev, devStates);
 
-	// cudaMemcpy(host, dev, BLOCKS * THREADS * sizeof(Real), cudaMemcpyDeviceToHost); // return results 
+	cudaMemcpy(host, dev, BLOCKS * THREADS * sizeof(Real), cudaMemcpyDeviceToHost); // return results 
 
-	// Real pi_gpu;
-	// for(int i = 0; i < BLOCKS * THREADS; i++) {
-	// 	pi_gpu += host[i];
-	// }
+	Real pi_gpu;
+	for(int i = 0; i < BLOCKS * THREADS; i++) {
+		pi_gpu += host[i];
+	}
 
-	// pi_gpu /= (BLOCKS * THREADS);
+	pi_gpu /= (BLOCKS * THREADS);
 
 	stop = clock();
 
@@ -204,7 +204,7 @@ BLOCKS, THREADS);
      
      }
      
-   printf("TOT_COUNT: %ld\n",total_tasks );
+   // printf("TOT_COUNT: %ld\n",total_tasks );
    Real pthread_pi=4*((Real)tot_in/total_tasks);
    stop = clock();
    #ifdef DP
@@ -229,36 +229,21 @@ BLOCKS, THREADS);
 
 	#endif
 
-	// printf("CUDA estimate of PI = %f [error of %f]\n", pi_gpu, pi_gpu - PI);
 	
 	#ifdef DP
-		// printf("CUDA estimate of PI = %20.18f [error of %20.18f]\n", pi_gpu, pi_gpu - PI);
+		printf("CUDA estimate of PI = %20.18f [error of %20.18f]\n", pi_gpu, pi_gpu - PI);
 		printf("CPU estimate of PI = %20.18f [error of %20.18f]\n", pi_cpu, pi_cpu - PI);
 		printf("PThread estimate of PI = %20.18f [error of %20.18f]\n",pthread_pi,pthread_pi - PI);
 
 	#else
-		// printf("CUDA estimate of PI = %f [error of %f]\n", pi_gpu, pi_gpu - PI);
+		printf("CUDA estimate of PI = %f [error of %f]\n", pi_gpu, pi_gpu - PI);
 		printf("CPU estimate of PI = %f [error of %f]\n", pi_cpu, pi_cpu - PI);
 		printf("PThread estimate of PI = %f [error of %f]\n",pthread_pi,pthread_pi - PI);
 
 	#endif
-	// return 0;
-	// 
+	printf("Came\n");
 	/* Last thing that main() should do */
    pthread_exit(NULL);
+
+   return 0;
 }
-
-/**
- * Prints the difference between two given times
- * @param start  start time
- * @param finish end time
- */
-// void print_time_difference(clock_t start,clock_t finish){
-// 	#ifdef DP
-// 		printf("GPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
-
-// 	#else
-// 		printf("GPU pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
-
-// 	#endif
-// }
