@@ -11,11 +11,10 @@
 #include <curand_kernel.h>
 #include <pthread.h>
 
-#define NUM_THREADS 8         //number of threads
-#define TOT_COUNT 10000055      //total number of iterations
 #define TRIALS_PER_THREAD 4096
 #define BLOCKS 256
 #define THREADS 256
+
 
 //Help code for switching between Single Precision and Double Precision
 #ifdef DP
@@ -42,6 +41,7 @@ Real randNumGen(){
 struct pthread_arg_struct {
     int tid;
     int total_threads;
+    long total_tasks;
 };
 
 
@@ -54,17 +54,17 @@ void *doCalcs(void *arguments)
 
 	int total_threads = args -> total_threads;
 	
-
+	long total_tasks=args -> total_tasks; //total number of tasks
    int tid = args -> tid;       //obtain the value of thread id
    // printf("tid %d\n", tid);
 
    //using malloc for the return variable in order make
    //sure that it is not destroyed once the thread call is finished
-   Real *in_count = (Real *)malloc(sizeof(Real));
+   long *in_count = (long *)malloc(sizeof(long));
    *in_count=0;
    
    //get the total number of iterations for a thread
-   Real tot_iterations= TOT_COUNT/total_threads;
+   Real tot_iterations= total_tasks/total_threads;
    
    int counter=0;
    
@@ -83,7 +83,7 @@ void *doCalcs(void *arguments)
    
    //get the remaining iterations calculated by thread 0
    if(tid==0){
-      Real remainder = TOT_COUNT%total_threads;
+      Real remainder = total_tasks%total_threads;
       
       for(counter=0;counter<remainder;counter++){
       Real x = randNumGen();
@@ -143,7 +143,8 @@ int main (int argc, char *argv[]) {
    	int rc;
    	long t;
    	void *status;
-   	Real tot_in=0;
+   	long tot_in=0;
+   	long total_tasks=BLOCKS*THREADS*TRIALS_PER_THREAD;
 
 	// Real host[BLOCKS * THREADS];
 	// Real *dev;
@@ -181,10 +182,12 @@ BLOCKS, THREADS);
 	
 
 	// PThreads
+	start = clock();
 	for(t=0;t<total_threads;t++){
 		struct pthread_arg_struct* args=(struct pthread_arg_struct*)malloc(sizeof *args);
 		args->total_threads=total_threads;
 		args->tid=t;
+		args->total_tasks=BLOCKS*THREADS*TRIALS_PER_THREAD;
      	rc = pthread_create(&threads[t], NULL, doCalcs, (void *)args);
      	if (rc){
        		printf("ERROR; return code from pthread_create() is %d\n", rc);
@@ -196,11 +199,21 @@ BLOCKS, THREADS);
    	for(t=0;t<total_threads;t++){
            
       	pthread_join(threads[t], &status);
-	    tot_in+=*(Real*)status;            //keep track of the total in count
+	    tot_in+=*(long*)status;            //keep track of the total in count
+	    printf("Thread: %ld %ld\n",t,tot_in );
      
      }
      
-   Real pthread_pi=4*(tot_in/TOT_COUNT);
+   printf("TOT_COUNT: %ld\n",total_tasks );
+   Real pthread_pi=4*((Real)tot_in/total_tasks);
+   stop = clock();
+   #ifdef DP
+		printf("PThreads pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+
+	#else
+		printf("PThreads pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+
+	#endif
    //End of PThreads 
 	
 
