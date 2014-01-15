@@ -1,3 +1,5 @@
+// clear;rm a.out; nvcc -O3 -arch sm_20 q2.cu ; ./a.out -c
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <cuda.h>
@@ -14,8 +16,8 @@
 // PThread related
 #define MAX_PTHREADS 8
 
-// #define VECTOR_SIZE 100000000  //1e8
-#define VECTOR_SIZE 500  //1e8
+#define VECTOR_SIZE 100000000  //1e8
+// #define VECTOR_SIZE 500  //1e8
 
 
 //Help code for switching between Single Precision and Double Precision
@@ -164,13 +166,14 @@ typedef float Real;
  	
  	long upperbound=lowerbound+CALCS_PER_THREAD-1;
 	// printf("%ld - %ld - %ld \n", start_point,lowerbound,upperbound);
- 	for(int index=lowerbound;index<=upperbound;index++){
- 		// printf("%ld - %ld - %ld - %d\n", start_point,lowerbound,upperbound,index);
+ 	for(long index=lowerbound;index<=upperbound;index++){
+ 		// printf("%ld - %ld - %ld - %ld\n", start_point,lowerbound,upperbound,index);
 		result[index] = vector1[index]*vector2[index];
- 		// result[1] = 13;
+ 		result[1] = 13;
+ 		// vector1[index]=12;
 
  	}
- 		// printf("2-Hello thread %d\n", threadIdx.x);
+ 		printf("2-Hello thread %d\n", threadIdx.x);
  	// result[start_point]=23;
 
  	
