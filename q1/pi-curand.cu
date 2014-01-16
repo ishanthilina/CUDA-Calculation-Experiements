@@ -2,6 +2,17 @@
 
 // Written by Barry Wilkinson, UNC-Charlotte. Pi.cu  December 22, 2010.
 //Derived somewhat from code developed by Patrick Rogers, UNC-C
+//
+//How to run?
+//===========
+//
+//Single precision :
+//
+//nvcc -O3 pi-curand.cu ; ./a.out 4
+//
+//Double precision
+//
+//nvcc -O3 -D DP -arch sm_20 pi-curand.cu ; ./a.out 4
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -100,7 +111,6 @@ void *doCalcs(void *arguments)
 
 
    //printf("In count from #%d : %f\n",tid,*in_count);
-   printf("exit %d\n",tid );
    pthread_exit((void *)in_count);     //return the in count
 }
 
@@ -198,13 +208,11 @@ BLOCKS, THREADS);
   	//join the threads
    	for(t=0;t<total_threads;t++){
            
-      	pthread_join(threads[t], &status);
+      pthread_join(threads[t], &status);
 	    tot_in+=*(long*)status;            //keep track of the total in count
-	    printf("Thread: %ld %ld\n",t,tot_in );
      
      }
      
-   // printf("TOT_COUNT: %ld\n",total_tasks );
    Real pthread_pi=4*((Real)tot_in/total_tasks);
    stop = clock();
    #ifdef DP
@@ -241,9 +249,8 @@ BLOCKS, THREADS);
 		printf("PThread estimate of PI = %f [error of %f]\n",pthread_pi,pthread_pi - PI);
 
 	#endif
-	printf("Came\n");
 	/* Last thing that main() should do */
-   pthread_exit(NULL);
+   // pthread_exit(NULL);
 
    return 0;
 }
