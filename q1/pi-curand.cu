@@ -52,7 +52,7 @@ Real randNumGen(){
 struct pthread_arg_struct {
     int tid;
     int total_threads;
-    long total_tasks;
+    double total_tasks;
 };
 
 
@@ -63,21 +63,22 @@ void *doCalcs(void *arguments)
 {
 	struct pthread_arg_struct *args = (struct pthread_arg_struct *)arguments;
 
-	int total_threads = args -> total_threads;
+	double total_threads = args -> total_threads;
 	
-	long total_tasks=args -> total_tasks; //total number of tasks
+	double total_tasks=args -> total_tasks; //total number of tasks
    int tid = args -> tid;       //obtain the value of thread id
-   // printf("tid %d\n", tid);
+   // printf("tid %d %lf\n", tid, total_tasks);
 
    //using malloc for the return variable in order make
    //sure that it is not destroyed once the thread call is finished
-   long *in_count = (long *)malloc(sizeof(long));
+   double *in_count = (double *)malloc(sizeof(double));
    *in_count=0;
    
    //get the total number of iterations for a thread
-   Real tot_iterations= total_tasks/total_threads;
+   double tot_iterations= total_tasks/total_threads;
+   // printf("%lf\n", tot_iterations);
    
-   int counter=0;
+   long counter=0;
    
    //calculation
    for(counter=0;counter<tot_iterations;counter++){
@@ -94,7 +95,9 @@ void *doCalcs(void *arguments)
    
    //get the remaining iterations calculated by thread 0
    if(tid==0){
-      Real remainder = total_tasks%total_threads;
+      // int remainder = total_tasks%total_threads;
+      double remainder = fmod((double)total_tasks,total_threads);
+      // printf("%lf remainder\n", remainder );
       
       for(counter=0;counter<remainder;counter++){
       Real x = rand_r((unsigned int*) &tid) / (Real) RAND_MAX;
@@ -110,7 +113,7 @@ void *doCalcs(void *arguments)
    }
 
 
-   //printf("In count from #%d : %f\n",tid,*in_count);
+   printf("In count from #%d : %lf\n",tid,*in_count);
    pthread_exit((void *)in_count);     //return the in count
 }
 
@@ -140,6 +143,8 @@ Real host_monte_carlo(long trials) {
 		y = rand() / (Real) RAND_MAX;
 		points_in_circle += (x*x + y*y <= 1.0f);
 	}
+  printf("Serial- points_in_circle : %ld\n", points_in_circle);
+  printf("Serial- trials: %ld\n",trials );
 	return 4.0f * points_in_circle / trials;
 }
 
@@ -153,8 +158,8 @@ int main (int argc, char *argv[]) {
    	int rc;
    	long t;
    	void *status;
-   	long tot_in=0;
-   	long total_tasks=BLOCKS*THREADS*TRIALS_PER_THREAD;
+   	double tot_in=0;
+   	long total_tasks=pow(2,28);
 
 	Real host[BLOCKS * THREADS];
 	Real *dev;
@@ -197,7 +202,8 @@ BLOCKS, THREADS);
 		struct pthread_arg_struct* args=(struct pthread_arg_struct*)malloc(sizeof *args);
 		args->total_threads=total_threads;
 		args->tid=t;
-		args->total_tasks=BLOCKS*THREADS*TRIALS_PER_THREAD;
+		// args->total_tasks=BLOCKS*THREADS*TRIALS_PER_THREAD;
+    args->total_tasks=total_tasks;
      	rc = pthread_create(&threads[t], NULL, doCalcs, (void *)args);
      	if (rc){
        		printf("ERROR; return code from pthread_create() is %d\n", rc);
@@ -209,11 +215,13 @@ BLOCKS, THREADS);
    	for(t=0;t<total_threads;t++){
            
       pthread_join(threads[t], &status);
-	    tot_in+=*(long*)status;            //keep track of the total in count
-     
+	    tot_in+=*(double*)status;            //keep track of the total in count 
+      printf("tot_in IN LOOP: %lf\n", tot_in);  
      }
-     
-   Real pthread_pi=4*((Real)tot_in/total_tasks);
+   printf("tot_in : %lf\n", tot_in);
+   printf("total_tasks : %ld\n", total_tasks);  
+
+   Real pthread_pi=4*(tot_in/total_tasks);
    stop = clock();
    #ifdef DP
 		printf("PThreads pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
@@ -226,7 +234,7 @@ BLOCKS, THREADS);
 	
 
 	start = clock();
-	Real pi_cpu = host_monte_carlo(BLOCKS * THREADS * TRIALS_PER_THREAD);
+	Real pi_cpu = host_monte_carlo(total_tasks);
 	stop = clock();
 
 	#ifdef DP
