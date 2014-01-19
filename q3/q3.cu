@@ -1,8 +1,24 @@
+// How to use?
+// ===========
+// Single precision Serial mode:
+// 
+// clear;rm a.out; nvcc -O3 q3.cu ;./a.out -s
+// 
+// Single precision PThreads mode: 
+// 
+// clear;rm a.out; nvcc -O3 q3.cu ;./a.out -p <num of threads>
+// 
+// Single precision Cuda simple calculation mode:
+// 
 // clear;rm a.out; nvcc -O3 q3.cu ;./a.out -c
 // 
-// clear;rm a.out; nvcc -O3 -D DP -arch sm_20 -L /usr/local/cuda/lib -lcuda q3.cu ;./a.out -c
+// Single precision Cuda tiled mode:
 // 
-// clear;rm a.out; nvcc -O3 q3.cu ;./a.out -p 2
+// clear;rm a.out; nvcc -O3 q3.cu ;./a.out -c -t
+// 
+// To use with Double precision, use the -D DP option when compiling. Also for
+// CUDA based Double Precision calculation, a -arch sm_20 flag is recommended
+// to turn off the "Double is not supported. Demoting to float" warning.
 
 #include <stdlib.h>
 #include <stdio.h>
