@@ -11,6 +11,12 @@
 #include <time.h>
 #include <curand_kernel.h>
 #include <pthread.h>
+#include <time.h>
+#include <errno.h>
+
+#define GET_TIME(x); 	if (clock_gettime(CLOCK_MONOTONIC, &(x)) < 0) \
+{ perror("clock_gettime( ):"); exit(EXIT_FAILURE); }	
+
 
 #define MATRIX_DIM 1800
 
@@ -41,16 +47,35 @@ typedef double Real;
 typedef float Real;
 #endif
 
+/**
+ * Measures the time differences
+ * @param  begin begin time
+ * @param  end   end time
+ * @param  sec   resulting time in seconds
+ * @param  nsec  resulting time in nano-seconds
+ * @return       the time taken
+ */
+ float elapsed_time_msec(struct timespec *begin, struct timespec *end, long *sec, long *nsec)
+ {
+ 	if (end->tv_nsec < begin->tv_nsec) {
+ 		*nsec = 1000000000 - (begin->tv_nsec - end->tv_nsec);
+ 		*sec = end->tv_sec - begin->tv_sec -1;
+ 	}
+ 	else {
+ 		*nsec = end->tv_nsec - begin->tv_nsec;
+ 		*sec = end->tv_sec - begin->tv_sec;
+ 	}
+ 	return (float) (*sec) * 1000 + ((float) (*nsec)) / 1000000;
+ }
+ static unsigned long inKB(unsigned long bytes)
 
-static unsigned long inKB(unsigned long bytes)
-
-{ return bytes/1024; }
+ { return bytes/1024; }
 
 
 
-static unsigned long inMB(unsigned long bytes)
+ static unsigned long inMB(unsigned long bytes)
 
-{ return bytes/(1024*1024); }
+ { return bytes/(1024*1024); }
 
 
 /**
@@ -299,6 +324,10 @@ int main(int argc, char const *argv[])
 		print_usage();
 	}
 
+	struct timespec t1, t2;
+	long sec, nsec;
+	float comp_time;	// in milli seconds
+
  	// Initialize the random seed
 	srand(time(NULL));
 
@@ -316,7 +345,17 @@ int main(int argc, char const *argv[])
 
 	if (0 == strcmp(argv[1], "-s"))
 	{
+		GET_TIME(t1);
+
 		printf("serial mode\n");
+		// get the serial output
+		serial_mat_mul(A,B,serial_C);
+
+		GET_TIME(t2);
+
+		comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+		printf("N=%d: CPU Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
+
 	}
 	else if (0 == strcmp(argv[1], "-p"))
 	{
@@ -338,6 +377,8 @@ int main(int argc, char const *argv[])
 		int rc;
 		long t;
 		void *status;
+
+		GET_TIME(t1);
 
 		//initialize the threads
 		for(t=0;t<num_of_threads;t++){
@@ -362,9 +403,17 @@ int main(int argc, char const *argv[])
 			pthread_join(threads[t], &status);
 		}
 
+		GET_TIME(t2);
+		comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+		printf("N=%d: PThreads(%d threads)  Time(ms)=%.2f \n", MATRIX_DIM,num_of_threads, comp_time);
+
+		GET_TIME(t1);
         // get the serial output
 		serial_mat_mul(A,B,serial_C);
-
+		
+		GET_TIME(t1);
+		comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+		printf("N=%d: CPU Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
  		// print_matrix(serial_C);
  		// print_matrix(C);
 
@@ -404,14 +453,24 @@ int main(int argc, char const *argv[])
 			dimGrid.x = (MATRIX_DIM + dimBlock.x - 1)/dimBlock.x;
 			dimGrid.y = (MATRIX_DIM + dimBlock.y - 1)/dimBlock.y;
 
+			GET_TIME(t1);
  			// execute the workload in the GPU
 			cuda_tiled_mat_mul<<<dimGrid , dimBlock>>>(_A,_B,_C);
 
  			// Copy back the result
 			cudaMemcpy(C,_C,matrix_size,cudaMemcpyDeviceToHost);
 
+			GET_TIME(t2);
+			comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+			printf("N=%d: CUDA Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
+
+			GET_TIME(t1);
  			// get the serial output
 			serial_mat_mul(A,B,serial_C);
+
+			GET_TIME(t2);
+			comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+			printf("N=%d: CPU Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
 
  			// print_matrix(serial_C);
  			// print_matrix(C);
@@ -433,14 +492,24 @@ int main(int argc, char const *argv[])
 			dim3 threadBlock(BLOCK_SIZE,BLOCK_SIZE);
 			dim3 grid(K,K);
 
+			GET_TIME(t1);
  			// call the GPU
 			cuda_simple_mat_mul<<<grid,threadBlock>>>(_A,_B,_C);
 
  			// Copy back the result
 			cudaMemcpy(C,_C,matrix_size,cudaMemcpyDeviceToHost);
 
+			GET_TIME(t2);
+			comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+			printf("N=%d: CUDA Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
+
+			GET_TIME(t1);
  			// get the serial output
 			serial_mat_mul(A,B,serial_C);
+
+			GET_TIME(t2);
+			comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+			printf("N=%d: CPU Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
 
  			// print_matrix(serial_C);
  			// print_matrix(C);
