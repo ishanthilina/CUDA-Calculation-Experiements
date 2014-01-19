@@ -10,7 +10,13 @@
 #include <curand_kernel.h>
 #include <pthread.h>
 
-#define MATRIX_DIM 1600
+#define MATRIX_DIM 1800
+
+#define MIN_ERROR 0.001
+
+// CUDA related
+// #define THREADS_PER_BLOCK 256
+#define BLOCK_SIZE 16
 
 
 //Code to check for GPU errors
@@ -125,6 +131,37 @@ static unsigned long inMB(unsigned long bytes)
  		printf("\n");
  	}
 
+ 	void compare_matrices(Real matrix1[MATRIX_DIM][MATRIX_DIM], Real matrix2[MATRIX_DIM][MATRIX_DIM])
+ 	{
+ 		for(int i = 0; i < MATRIX_DIM; i++)
+ 		{
+ 			for(int j = 0; j < MATRIX_DIM; j++)
+ 			{
+ 				if((matrix1[i][j] - matrix2[i][j] > MIN_ERROR) &&
+ 					(matrix1[i][j] - matrix2[i][j] > 0))
+ 				{
+ 					printf("Error i=%d : j=%d mat1=%f mat2=%f\n",i,j,matrix1[i][j], matrix2[i][j]);
+ 					return;
+ 				}
+ 			}
+ 		}
+
+ 		printf("Matrices Match! \n");
+ 	} 
+
+ 	void serial_mat_mul(Real A[MATRIX_DIM][MATRIX_DIM], Real B[MATRIX_DIM][MATRIX_DIM], Real C[MATRIX_DIM][MATRIX_DIM])	{
+ 		float sum;
+ 		for (int row=0; row<MATRIX_DIM; row++){
+ 			for (int col=0; col<MATRIX_DIM; col++){
+ 				sum = 0.f;
+ 				for (int n=0; n<MATRIX_DIM; n++){
+ 					sum += A[row][n]*B[n][col];
+ 				}
+ 				C[row][col] = sum;
+ 			}
+ 		}
+ 	}
+
 /**
  * Shows the usage of the program.
  */
@@ -144,6 +181,7 @@ static unsigned long inMB(unsigned long bytes)
  	static Real A[MATRIX_DIM][MATRIX_DIM]; 
  	static Real B[MATRIX_DIM][MATRIX_DIM]; 
  	static Real C[MATRIX_DIM][MATRIX_DIM]; 
+ 	static Real serial_C[MATRIX_DIM][MATRIX_DIM]; 
  	// Initialize the matrices
  	init_matrix(A);
  	init_matrix(B);
@@ -169,11 +207,49 @@ static unsigned long inMB(unsigned long bytes)
  			printf("cuda mode\n");
 
  			long matrix_size=MATRIX_DIM*MATRIX_DIM*sizeof(Real);
- 			printf("%ld\n",matrix_size );
+ 			// printf("%ld\n",matrix_size );
 
  			Real* _A;
  			gpuErrchk(cudaMalloc((void**) &_A, matrix_size));
  			printStats();
+
+ 			Real* _B;
+ 			gpuErrchk(cudaMalloc((void**) &_B, matrix_size));
+ 			printStats();
+
+ 			Real* _C;
+ 			gpuErrchk(cudaMalloc((void**) &_C, matrix_size));
+ 			printStats();
+
+ 			// copy the matrices to device
+ 			cudaMemcpy(_A, A, matrix_size, cudaMemcpyHostToDevice);
+ 			cudaMemcpy(_B, B, matrix_size, cudaMemcpyHostToDevice);
+
+ 			int K;
+ 			K = 115;			
+ 			
+ 			dim3 threadBlock(BLOCK_SIZE,BLOCK_SIZE);
+ 			dim3 grid(K,K);
+
+ 			// call the GPU
+ 			cuda_simple_mat_mul<<<grid,threadBlock>>>(_A,_B,_C);
+
+ 			// Copy back the result
+ 			cudaMemcpy(C,_C,matrix_size,cudaMemcpyDeviceToHost);
+
+ 			// get the serial output
+ 			serial_mat_mul(A,B,serial_C);
+
+ 			// print_matrix(serial_C);
+ 			// print_matrix(C);
+
+ 			compare_matrices(serial_C,C);
+
+ 			// free device memory
+         cudaFree(_A);
+         cudaFree(_B);
+         cudaFree(_C);
+
 
  		}
  		
