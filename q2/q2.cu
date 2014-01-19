@@ -1,5 +1,7 @@
 // clear;rm a.out; nvcc -O3 -D DP -L /usr/local/cuda/lib -lcuda -arch sm_30 q2.cu ;./a.out -c
 // 
+// clear;rm a.out; nvcc -O3 -L /usr/local/cuda/lib -lcuda q2.cu ;./a.out -c
+// 
 // 
 // http://stackoverflow.com/questions/14038589/what-is-the-canonical-way-to-check-for-errors-using-the-cuda-runtime-api
 
