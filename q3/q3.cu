@@ -12,11 +12,11 @@
 
 #define MATRIX_DIM 1800
 
-#define MIN_ERROR 0.001
+#define MIN_ERROR 0.1
 
 // CUDA related
 // #define THREADS_PER_BLOCK 256
-#define BLOCK_SIZE 16
+#define BLOCK_SIZE 32
 
 
 //Code to check for GPU errors
@@ -141,7 +141,7 @@ static unsigned long inMB(unsigned long bytes)
  					(matrix1[i][j] - matrix2[i][j] > 0))
  				{
  					printf("Error i=%d : j=%d mat1=%f mat2=%f\n",i,j,matrix1[i][j], matrix2[i][j]);
- 					return;
+ 					// return;
  				}
  			}
  		}
@@ -168,6 +168,56 @@ static unsigned long inMB(unsigned long bytes)
  void print_usage(){
  	printf("Wrong usage!\n");
  }
+
+ __global__ void cuda_tiled_mat_mul(Real * A, Real * B, Real * C) {
+ 	// Real CValue = 0;
+ 	// if (((blockIdx.y * blockDim.y + threadIdx.y)< MATRIX_DIM) && ((blockIdx.x * blockDim.x + threadIdx.x) < MATRIX_DIM)) {
+ 	// 	for (int k = 0; k < (MATRIX_DIM / BLOCK_SIZE); ++k) {
+
+ 	// 		Real * ASub =  &A[MATRIX_DIM * BLOCK_SIZE * blockIdx.y + BLOCK_SIZE * k];
+ 	// 		Real * BSub = &B[MATRIX_DIM*BLOCK_SIZE*k + BLOCK_SIZE*blockIdx.x];
+
+ 	// 		__shared__ Real As[BLOCK_SIZE][BLOCK_SIZE];
+ 	// 		__shared__ Real Bs[BLOCK_SIZE][BLOCK_SIZE];
+
+ 	// 		As[threadIdx.y][threadIdx.x] = ASub[threadIdx.y*MATRIX_DIM+threadIdx.x];
+ 	// 		Bs[threadIdx.y][threadIdx.x] = BSub[threadIdx.y*MATRIX_DIM+threadIdx.x];
+
+ 	// 		__syncthreads();
+ 	// 		for (int n = 0; n < BLOCK_SIZE; ++n)
+ 	// 			CValue += As[threadIdx.y][n] * Bs[n][threadIdx.x];
+ 	// 		__syncthreads();
+ 	// 	}
+ 	// 	C[((blockIdx.y * blockDim.y + threadIdx.y)*MATRIX_DIM)+(blockIdx.x*blockDim.x)+threadIdx.x]=CValue;
+ 	// }
+ 	// 
+ 	float CValue = 0;
+
+ 	int Row = blockIdx.y*BLOCK_SIZE + threadIdx.y;
+ 	int Col = blockIdx.x*BLOCK_SIZE + threadIdx.x;
+
+ 	__shared__ Real As[BLOCK_SIZE][BLOCK_SIZE];
+ 	__shared__ Real Bs[BLOCK_SIZE][BLOCK_SIZE];
+
+ 	for (int k = 0; k < (BLOCK_SIZE + MATRIX_DIM - 1)/BLOCK_SIZE; k++) {
+
+ 		if (k*BLOCK_SIZE + threadIdx.x < MATRIX_DIM && Row < MATRIX_DIM)   As[threadIdx.y][threadIdx.x] = A[Row*MATRIX_DIM + k*BLOCK_SIZE + threadIdx.x];
+ 		else                                                   As[threadIdx.y][threadIdx.x] = 0.0;
+
+ 		if (k*BLOCK_SIZE + threadIdx.y < MATRIX_DIM && Col < MATRIX_DIM)   Bs[threadIdx.y][threadIdx.x] = B[(k*BLOCK_SIZE + threadIdx.y)*MATRIX_DIM + Col];
+ 		else                                                   Bs[threadIdx.y][threadIdx.x] = 0.0;
+
+ 		__syncthreads();
+
+ 		for (int n = 0; n < BLOCK_SIZE; ++n) CValue += As[threadIdx.y][n] * Bs[n][threadIdx.x];
+
+ 			__syncthreads();
+ 	}
+
+ 	if (Row < MATRIX_DIM && Col < MATRIX_DIM) C[((blockIdx.y * blockDim.y + threadIdx.y)*MATRIX_DIM)+(blockIdx.x*blockDim.x)+threadIdx.x]=CValue;
+
+ }
+
 
  int main(int argc, char const *argv[])
  {
@@ -199,34 +249,61 @@ static unsigned long inMB(unsigned long bytes)
  	}
  	else if (0 == strcmp(argv[1], "-c"))
  	{
+
+ 		long matrix_size=MATRIX_DIM*MATRIX_DIM*sizeof(Real);
+ 			// printf("%ld\n",matrix_size );
+
+ 		Real* _A;
+ 		gpuErrchk(cudaMalloc((void**) &_A, matrix_size));
+ 		printStats();
+
+ 		Real* _B;
+ 		gpuErrchk(cudaMalloc((void**) &_B, matrix_size));
+ 		printStats();
+
+ 		Real* _C;
+ 		gpuErrchk(cudaMalloc((void**) &_C, matrix_size));
+ 		printStats();
+
+ 			// copy the matrices to device
+ 		cudaMemcpy(_A, A, matrix_size, cudaMemcpyHostToDevice);
+ 		cudaMemcpy(_B, B, matrix_size, cudaMemcpyHostToDevice);
+
  		// If the tiled mode needs to be enabled
  		if (argc>2 && 0 == strcmp(argv[2], "-t")){
  			printf("cuda tiled mode\n");
+
+ 			dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE, 1);
+ 			dim3 dimGrid;
+ 			dimGrid.x = (MATRIX_DIM + dimBlock.x - 1)/dimBlock.x;
+ 			dimGrid.y = (MATRIX_DIM + dimBlock.y - 1)/dimBlock.y;
+
+ 			cuda_tiled_mat_mul<<<dimGrid , dimBlock>>>(_A,_B,_C);
+
+ 			// Copy back the result
+ 			cudaMemcpy(C,_C,matrix_size,cudaMemcpyDeviceToHost);
+
+ 			// get the serial output
+ 			serial_mat_mul(A,B,serial_C);
+
+ 			// print_matrix(serial_C);
+ 			// print_matrix(C);
+
+ 			compare_matrices(serial_C,C);
+
+ 			// free device memory
+ 			cudaFree(_A);
+ 			cudaFree(_B);
+ 			cudaFree(_C);
+
  		}
  		else{
  			printf("cuda mode\n");
 
- 			long matrix_size=MATRIX_DIM*MATRIX_DIM*sizeof(Real);
- 			// printf("%ld\n",matrix_size );
-
- 			Real* _A;
- 			gpuErrchk(cudaMalloc((void**) &_A, matrix_size));
- 			printStats();
-
- 			Real* _B;
- 			gpuErrchk(cudaMalloc((void**) &_B, matrix_size));
- 			printStats();
-
- 			Real* _C;
- 			gpuErrchk(cudaMalloc((void**) &_C, matrix_size));
- 			printStats();
-
- 			// copy the matrices to device
- 			cudaMemcpy(_A, A, matrix_size, cudaMemcpyHostToDevice);
- 			cudaMemcpy(_B, B, matrix_size, cudaMemcpyHostToDevice);
+ 			
 
  			int K;
- 			K = 115;			
+ 			K = 100;			
  			
  			dim3 threadBlock(BLOCK_SIZE,BLOCK_SIZE);
  			dim3 grid(K,K);
@@ -246,9 +323,9 @@ static unsigned long inMB(unsigned long bytes)
  			compare_matrices(serial_C,C);
 
  			// free device memory
-         cudaFree(_A);
-         cudaFree(_B);
-         cudaFree(_C);
+ 			cudaFree(_A);
+ 			cudaFree(_B);
+ 			cudaFree(_C);
 
 
  		}
