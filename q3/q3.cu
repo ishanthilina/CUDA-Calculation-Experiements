@@ -1,6 +1,8 @@
 // clear;rm a.out; nvcc -O3 q3.cu ;./a.out -c
 // 
-// clear;rm a.out; nvcc -O3 -D DP -L /usr/local/cuda/lib -lcuda q3.cu ;./a.out -c
+// clear;rm a.out; nvcc -O3 -D DP -arch sm_20 -L /usr/local/cuda/lib -lcuda q3.cu ;./a.out -c
+// 
+// clear;rm a.out; nvcc -O3 q3.cu ;./a.out -p 2
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -17,6 +19,8 @@
 // CUDA related
 #define BLOCK_SIZE 32
 
+// PThread related
+#define MAX_PTHREADS 8
 
 //Code to check for GPU errors
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -25,7 +29,7 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
 	if (code != cudaSuccess) 
 	{
 		fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code),\
-		 file, line);
+			file, line);
 		if (abort) exit(code);
 	}
 }
@@ -243,123 +247,217 @@ static unsigned long inMB(unsigned long bytes)
 
  }
 
+ //struct for parameter passing between pthread calls
+ struct pthread_arg_struct {
+ 	int tid;
+ 	int total_threads;
+ 	Real (*A)[MATRIX_DIM];
+ 	Real (*B)[MATRIX_DIM];
+ 	Real (*C)[MATRIX_DIM];
+ };
 
- int main(int argc, char const *argv[])
+/**
+ * PThread code for assigning tasks to pthreads
+ * @param arguments an instance of pthread_arg_struct
+ */
+ void* pthread_mat_mul(void* arguments)
  {
+ 	struct pthread_arg_struct *args = (struct pthread_arg_struct *)arguments;
+ 	int total_threads = args -> total_threads;
+	int tid = args -> tid;       //obtain the value of thread id
+	Real (*A)[MATRIX_DIM]=args -> A;
+	Real (*B)[MATRIX_DIM]=args -> B;
 
- 	if(argc<2){
- 		print_usage();
- 	}
+	// get the workload for one thread
+	int chunk_size=MATRIX_DIM/total_threads;
+
+	// check for the row ranges the thread needs to calculate 
+	int min_row = chunk_size * tid;
+	int max_row = (min_row+chunk_size-1) < MATRIX_DIM ? (min_row+chunk_size-1) : MATRIX_DIM;
+
+	float sum=0.f;
+	// loop the matrix entries that belongs to this thread
+	for(;min_row<=max_row;min_row++){
+		for(int col=0;col<MATRIX_DIM;col++){
+			for (int n=0; n<MATRIX_DIM; n++){
+				sum += A[min_row][n]*B[n][col];
+			}
+			args->C[min_row][col] = sum;
+			sum=0;
+
+		}
+	}
+	
+
+	pthread_exit((void*)0);	
+}
+
+int main(int argc, char const *argv[])
+{
+
+	if(argc<2){
+		print_usage();
+	}
 
  	// Initialize the random seed
- 	srand(time(NULL));
+	srand(time(NULL));
 
  	// Create the matrices
- 	static Real A[MATRIX_DIM][MATRIX_DIM]; 
- 	static Real B[MATRIX_DIM][MATRIX_DIM]; 
- 	static Real C[MATRIX_DIM][MATRIX_DIM]; 
- 	static Real serial_C[MATRIX_DIM][MATRIX_DIM]; 
+	static Real A[MATRIX_DIM][MATRIX_DIM]; 
+	static Real B[MATRIX_DIM][MATRIX_DIM]; 
+	static Real C[MATRIX_DIM][MATRIX_DIM]; 
+	static Real serial_C[MATRIX_DIM][MATRIX_DIM]; 
  	// Initialize the matrices
- 	init_matrix(A);
- 	init_matrix(B);
+	init_matrix(A);
+	init_matrix(B);
  	// print_matrix(A);
  	// print_matrix(B);
 
 
- 	if (0 == strcmp(argv[1], "-s"))
- 	{
- 		printf("serial mode\n");
- 	}
- 	else if (0 == strcmp(argv[1], "-p"))
- 	{
- 		printf("pthread mode\n");
- 	}
- 	else if (0 == strcmp(argv[1], "-c"))
- 	{
+	if (0 == strcmp(argv[1], "-s"))
+	{
+		printf("serial mode\n");
+	}
+	else if (0 == strcmp(argv[1], "-p"))
+	{
+		printf("pthread mode\n");
 
- 		long matrix_size=MATRIX_DIM*MATRIX_DIM*sizeof(Real);
+		int num_of_threads;
+		// check whether the given # of threads is valid
+		if(argc !=3){
+			print_usage();
+			return -1;
+		}
+		num_of_threads=atoi(argv[2]);
+		if(num_of_threads>MAX_PTHREADS){
+			printf("[ERROR-PTHREADS] - Only up to 8 threads can be created\n");
+			return -1;
+		}
+
+		pthread_t threads[num_of_threads];
+		int rc;
+		long t;
+		void *status;
+
+		//initialize the threads
+		for(t=0;t<num_of_threads;t++){
+			struct pthread_arg_struct* args=(\
+				struct pthread_arg_struct*)malloc(sizeof *args);
+
+			args->total_threads=num_of_threads;
+			args->tid=t;
+			args-> A=A;
+			args-> B=B;
+			args-> C=C;
+
+			rc = pthread_create(&threads[t], NULL, pthread_mat_mul,(void *)args);
+			if (rc){
+				printf("ERROR; return code from pthread_create() is %d\n", rc);
+				exit(-1);
+			}
+		}
+
+		//join the threads
+		for(t=0;t<num_of_threads;t++){
+			pthread_join(threads[t], &status);
+		}
+
+        // get the serial output
+		serial_mat_mul(A,B,serial_C);
+
+ 		// print_matrix(serial_C);
+ 		// print_matrix(C);
+
+ 		// Compare the reuslts
+		compare_matrices(serial_C,C);
+
+	}
+	else if (0 == strcmp(argv[1], "-c"))
+	{
+
+		long matrix_size=MATRIX_DIM*MATRIX_DIM*sizeof(Real);
  			// printf("%ld\n",matrix_size );
 
- 		Real* _A;
- 		gpuErrchk(cudaMalloc((void**) &_A, matrix_size));
+		Real* _A;
+		gpuErrchk(cudaMalloc((void**) &_A, matrix_size));
  		// printStats();
 
- 		Real* _B;
- 		gpuErrchk(cudaMalloc((void**) &_B, matrix_size));
+		Real* _B;
+		gpuErrchk(cudaMalloc((void**) &_B, matrix_size));
  		// printStats();
 
- 		Real* _C;
- 		gpuErrchk(cudaMalloc((void**) &_C, matrix_size));
+		Real* _C;
+		gpuErrchk(cudaMalloc((void**) &_C, matrix_size));
  		// printStats();
 
  		// copy the matrices to device
- 		cudaMemcpy(_A, A, matrix_size, cudaMemcpyHostToDevice);
- 		cudaMemcpy(_B, B, matrix_size, cudaMemcpyHostToDevice);
+		cudaMemcpy(_A, A, matrix_size, cudaMemcpyHostToDevice);
+		cudaMemcpy(_B, B, matrix_size, cudaMemcpyHostToDevice);
 
  		// If the tiled mode needs to be enabled
- 		if (argc>2 && 0 == strcmp(argv[2], "-t")){
- 			printf("cuda tiled mode\n");
+		if (argc>2 && 0 == strcmp(argv[2], "-t")){
+			printf("cuda tiled mode\n");
 
  			// set the grid and block sizes
- 			dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE, 1);
- 			dim3 dimGrid;
- 			dimGrid.x = (MATRIX_DIM + dimBlock.x - 1)/dimBlock.x;
- 			dimGrid.y = (MATRIX_DIM + dimBlock.y - 1)/dimBlock.y;
+			dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE, 1);
+			dim3 dimGrid;
+			dimGrid.x = (MATRIX_DIM + dimBlock.x - 1)/dimBlock.x;
+			dimGrid.y = (MATRIX_DIM + dimBlock.y - 1)/dimBlock.y;
 
  			// execute the workload in the GPU
- 			cuda_tiled_mat_mul<<<dimGrid , dimBlock>>>(_A,_B,_C);
+			cuda_tiled_mat_mul<<<dimGrid , dimBlock>>>(_A,_B,_C);
 
  			// Copy back the result
- 			cudaMemcpy(C,_C,matrix_size,cudaMemcpyDeviceToHost);
+			cudaMemcpy(C,_C,matrix_size,cudaMemcpyDeviceToHost);
 
  			// get the serial output
- 			serial_mat_mul(A,B,serial_C);
+			serial_mat_mul(A,B,serial_C);
 
  			// print_matrix(serial_C);
  			// print_matrix(C);
 
  			// Compare the reuslts
- 			compare_matrices(serial_C,C);
+			compare_matrices(serial_C,C);
 
  			// free device memory
- 			cudaFree(_A);
- 			cudaFree(_B);
- 			cudaFree(_C);
+			cudaFree(_A);
+			cudaFree(_B);
+			cudaFree(_C);
 
- 		}
- 		else{
- 			printf("cuda mode\n");
+		}
+		else{
+			printf("cuda mode\n");
 
- 			int K=100;			
- 			
- 			dim3 threadBlock(BLOCK_SIZE,BLOCK_SIZE);
- 			dim3 grid(K,K);
+			int K=100;			
+
+			dim3 threadBlock(BLOCK_SIZE,BLOCK_SIZE);
+			dim3 grid(K,K);
 
  			// call the GPU
- 			cuda_simple_mat_mul<<<grid,threadBlock>>>(_A,_B,_C);
+			cuda_simple_mat_mul<<<grid,threadBlock>>>(_A,_B,_C);
 
  			// Copy back the result
- 			cudaMemcpy(C,_C,matrix_size,cudaMemcpyDeviceToHost);
+			cudaMemcpy(C,_C,matrix_size,cudaMemcpyDeviceToHost);
 
  			// get the serial output
- 			serial_mat_mul(A,B,serial_C);
+			serial_mat_mul(A,B,serial_C);
 
  			// print_matrix(serial_C);
  			// print_matrix(C);
 
- 			compare_matrices(serial_C,C);
+			compare_matrices(serial_C,C);
 
  			// free device memory
- 			cudaFree(_A);
- 			cudaFree(_B);
- 			cudaFree(_C);
+			cudaFree(_A);
+			cudaFree(_B);
+			cudaFree(_C);
 
 
- 		}
- 		
- 	}
- 	else{
- 		print_usage();
- 	}
- 	return 0;
- }
+		}
+
+	}
+	else{
+		print_usage();
+	}
+	return 0;
+}
