@@ -12,10 +12,10 @@
 // #define NBIN TRIALS_PER_THREAD*NUM_THREAD*NUM_BLOCK  // Number of bins 4096*256*256
 // 
 // // 2^28
-// #define NBIN 268435456  // Number of bins 4096*256*256
+#define NBIN 268435456  // Number of bins 4096*256*256
 
 // // 2^26
-#define NBIN 67108864  // Number of bins 1024*256*256
+// #define NBIN 67108864  // Number of bins 1024*256*256
 
 // 2^24
 // #define NBIN 16777216  // Number of bins 256*256*256
