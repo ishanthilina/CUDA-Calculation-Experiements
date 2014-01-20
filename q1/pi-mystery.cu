@@ -15,10 +15,10 @@
 // #define NBIN 268435456  // Number of bins 4096*256*256
 
 // // 2^26
-// #define NBIN 67108864  // Number of bins 1024*256*256
+#define NBIN 67108864  // Number of bins 1024*256*256
 
 // 2^24
-#define NBIN 16777216  // Number of bins 256*256*256
+// #define NBIN 16777216  // Number of bins 256*256*256
 
 //Help code for switching between Single Precision and Double Precision
 #ifdef DP

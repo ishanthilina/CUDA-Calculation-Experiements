@@ -88,7 +88,7 @@ int main(void)
 
   int M = BLOCKS*THREADS;
 
-  long total_tasks=pow(2,24);
+  long total_tasks=pow(2,26);
   int trials_per_thread= total_tasks/M;
 
   std::cout << "# of trials per thread = "<< trials_per_thread <<" # of blocks * # of threads/block = " 
