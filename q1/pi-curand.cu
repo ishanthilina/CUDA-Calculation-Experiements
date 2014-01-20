@@ -159,7 +159,7 @@ int main (int argc, char *argv[]) {
    	long t;
    	void *status;
    	double tot_in=0;
-   	long total_tasks=pow(2,28);
+   	long total_tasks=pow(2,24);
 
    	int trials_per_thread= total_tasks/(BLOCKS*THREADS);
 

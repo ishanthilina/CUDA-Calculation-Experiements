@@ -9,7 +9,12 @@
 #include <math.h>
 #include <time.h>
 
-#define TRIALS_PER_THREAD 4096
+// for 2^24
+#define TRIALS_PER_THREAD 256
+// for 2^26
+// #define TRIALS_PER_THREAD 1024
+// for 2^28
+// #define TRIALS_PER_THREAD 4096
 #define BLOCKS 256
 #define THREADS 256
 
