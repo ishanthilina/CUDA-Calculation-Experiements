@@ -98,8 +98,15 @@ BLOCKS, THREADS);
 	stop = clock();
 	printf("CPU pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
 
+	
+
+	#ifdef DP
+	printf("CUDA estimate of PI = %20.18f [error of %20.18f]\n", pi_gpu, pi_gpu - PI);
+	printf("CPU estimate of PI = %20.18f [error of %20.18f]\n", pi_cpu, pi_cpu - PI);
+	#else
 	printf("CUDA estimate of PI = %f [error of %f]\n", pi_gpu, pi_gpu - PI);
 	printf("CPU estimate of PI = %f [error of %f]\n", pi_cpu, pi_cpu - PI);
+	#endif
 	
 	return 0;
 }

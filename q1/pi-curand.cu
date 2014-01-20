@@ -189,13 +189,13 @@ BLOCKS, THREADS);
 
 	stop = clock();
 
-	#ifdef DP
-		printf("GPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+	// #ifdef DP
+	// 	printf("GPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
 
-	#else
-		printf("GPU pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+	// #else
+		printf("GPU pi calculated in %f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
 
-	#endif
+	// #endif
 	
 
 	// PThreads
@@ -225,13 +225,13 @@ BLOCKS, THREADS);
 
    Real pthread_pi=4*(tot_in/total_tasks);
    stop = clock();
-   #ifdef DP
-		printf("PThreads pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+ //   #ifdef DP
+	// 	printf("PThreads pi calculated in %20.18f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
 
-	#else
-		printf("PThreads pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+	// #else
+		printf("PThreads pi calculated in %f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
 
-	#endif
+	// #endif
    //End of PThreads 
 	
 
@@ -239,13 +239,13 @@ BLOCKS, THREADS);
 	Real pi_cpu = host_monte_carlo(total_tasks);
 	stop = clock();
 
-	#ifdef DP
-		printf("CPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+	// #ifdef DP
+	// 	printf("CPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
 
-	#else
-		printf("CPU pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+	// #else
+		printf("CPU pi calculated in %f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
 
-	#endif
+	// #endif
 
 	
 	#ifdef DP

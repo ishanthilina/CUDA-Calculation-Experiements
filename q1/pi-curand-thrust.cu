@@ -114,7 +114,7 @@ int main(void)
   #endif
 
   
-  std::cout << "THRUST pi calculated in " << (stop-start)/(Real)CLOCKS_PER_SEC << " s."<< std::endl;
+  std::cout << "THRUST pi calculated in " << (stop-start)/(float)CLOCKS_PER_SEC << " s."<< std::endl;
 
   std::cout << "THRUST estimate of PI = " << estimate << " [error of " << estimate - PI << "]" << std::endl;
 
