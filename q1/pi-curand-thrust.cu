@@ -1,3 +1,9 @@
+// How to run
+// ==========
+// nvcc -O3  pi-curand-thrust.cu ;./a.out
+// 
+// Add -D DP parameter for double precision
+
 // Source: http://docs.nvidia.com/cuda/curand/index.html
 
 #include <thrust/iterator/counting_iterator.h>
