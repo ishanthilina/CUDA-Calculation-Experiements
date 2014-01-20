@@ -25,7 +25,7 @@ typedef float Real;
 // we could vary M & N to find the perf sweet spot
 
 struct estimate_pi : 
-public thrust::unary_function<unsigned int, float>
+public thrust::unary_function<unsigned int, Real>
 {
 
   const int trials;
