@@ -363,7 +363,7 @@ int main(int argc, char const *argv[])
 	{
 		GET_TIME(t1);
 
-		printf("serial mode\n");
+		printf("serial mode\n\n");
 		// get the serial output
 		serial_mat_mul(A,B,serial_C);
 
@@ -375,11 +375,11 @@ int main(int argc, char const *argv[])
 	}
 	else if (0 == strcmp(argv[1], "-p"))
 	{
-		printf("pthread mode\n");
+		printf("pthread mode\n\n");
 
 		int num_of_threads;
 		// check whether the given # of threads is valid
-		if(argc !=3){
+		if(argc <3){
 			print_usage();
 			return -1;
 		}
@@ -423,18 +423,22 @@ int main(int argc, char const *argv[])
 		comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
 		printf("N=%d: PThreads(%d threads)  Time(ms)=%.2f \n", MATRIX_DIM,num_of_threads, comp_time);
 
-		GET_TIME(t1);
+		// if verification is needed
+		if((argc ==4) && (0 == strcmp(argv[3], "-v"))){
+			GET_TIME(t1);
         // get the serial output
-		serial_mat_mul(A,B,serial_C);
-		
-		GET_TIME(t1);
-		comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
-		printf("N=%d: CPU Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
+			serial_mat_mul(A,B,serial_C);
+
+			GET_TIME(t1);
+			comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+			printf("N=%d: CPU Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
  		// print_matrix(serial_C);
  		// print_matrix(C);
 
  		// Compare the reuslts
-		compare_matrices(serial_C,C);
+			compare_matrices(serial_C,C);
+
+		}
 
 	}
 	else if (0 == strcmp(argv[1], "-c"))
@@ -480,19 +484,25 @@ int main(int argc, char const *argv[])
 			comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
 			printf("N=%d: CUDA Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
 
-			GET_TIME(t1);
+			
+			// if verification is needed
+			if((argc ==4) && (0 == strcmp(argv[3], "-v"))){
+				GET_TIME(t1);
  			// get the serial output
-			serial_mat_mul(A,B,serial_C);
+				serial_mat_mul(A,B,serial_C);
 
-			GET_TIME(t2);
-			comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
-			printf("N=%d: CPU Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
+				GET_TIME(t2);
+				comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+				printf("N=%d: CPU Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
 
- 			// print_matrix(serial_C);
- 			// print_matrix(C);
+ 				// print_matrix(serial_C);
+ 				// print_matrix(C);
 
  			// Compare the reuslts
-			compare_matrices(serial_C,C);
+				compare_matrices(serial_C,C);
+			}
+
+			
 
  			// free device memory
 			cudaFree(_A);
@@ -519,18 +529,25 @@ int main(int argc, char const *argv[])
 			comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
 			printf("N=%d: CUDA Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
 
-			GET_TIME(t1);
- 			// get the serial output
-			serial_mat_mul(A,B,serial_C);
+			// if verification is needed
+			if((argc ==3) && (0 == strcmp(argv[2], "-v"))){
+				GET_TIME(t1);
+ 				// get the serial output
+				serial_mat_mul(A,B,serial_C);
 
-			GET_TIME(t2);
-			comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
-			printf("N=%d: CPU Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
+				GET_TIME(t2);
+				comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+				printf("N=%d: CPU Time(ms)=%.2f \n", MATRIX_DIM, comp_time);
 
- 			// print_matrix(serial_C);
- 			// print_matrix(C);
+	 			// print_matrix(serial_C);
+ 				// print_matrix(C);
 
-			compare_matrices(serial_C,C);
+				compare_matrices(serial_C,C);
+
+			}
+
+
+			
 
  			// free device memory
 			cudaFree(_A);
