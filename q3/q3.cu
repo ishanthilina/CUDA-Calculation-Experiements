@@ -19,6 +19,10 @@
 // To use with Double precision, use the -D DP option when compiling. Also for
 // CUDA based Double Precision calculation, a -arch sm_20 flag is recommended
 // to turn off the "Double is not supported. Demoting to float" warning.
+// 
+// Add a -v flag at the end when running the code if verification is needed.
+// ex - clear;rm a.out; nvcc -O3 q3.cu ;./a.out -c -t -v
+// 
 
 #include <stdlib.h>
 #include <stdio.h>
