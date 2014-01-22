@@ -113,13 +113,13 @@ void *doCalcs(void *arguments)
    }
 
 
-   printf("In count from #%d : %lf\n",tid,*in_count);
+   // printf("In count from #%d : %lf\n",tid,*in_count);
    pthread_exit((void *)in_count);     //return the in count
 }
 
 
 
-__global__ void gpu_monte_carlo(Real *estimate, curandState *states) {
+__global__ void gpu_monte_carlo(Real *estimate, curandState *states, int trials) {
 	unsigned int tid = threadIdx.x + blockDim.x * blockIdx.x;
 	int points_in_circle = 0;
 	Real x, y;
@@ -127,12 +127,12 @@ __global__ void gpu_monte_carlo(Real *estimate, curandState *states) {
 	curand_init(1234, tid, 0, &states[tid]);  // 	Initialize CURAND
 
 
-	for(int i = 0; i < TRIALS_PER_THREAD; i++) {
+	for(int i = 0; i < trials; i++) {
 		x = curand_uniform (&states[tid]);
 		y = curand_uniform (&states[tid]);
 		points_in_circle += (x*x + y*y <= 1.0f); // count if x & y is in the circle.
 	}
-	estimate[tid] = 4.0f * points_in_circle / (Real) TRIALS_PER_THREAD; // return estimate of pi
+	estimate[tid] = 4.0f * points_in_circle / (Real) trials; // return estimate of pi
 }
 
 Real host_monte_carlo(long trials) {
@@ -143,8 +143,8 @@ Real host_monte_carlo(long trials) {
 		y = rand() / (Real) RAND_MAX;
 		points_in_circle += (x*x + y*y <= 1.0f);
 	}
-  printf("Serial- points_in_circle : %ld\n", points_in_circle);
-  printf("Serial- trials: %ld\n",trials );
+  // printf("Serial- points_in_circle : %ld\n", points_in_circle);
+  // printf("Serial- trials: %ld\n",trials );
 	return 4.0f * points_in_circle / trials;
 }
 
@@ -161,11 +161,13 @@ int main (int argc, char *argv[]) {
    	double tot_in=0;
    	long total_tasks=pow(2,28);
 
+   	int trials_per_thread= total_tasks/(BLOCKS*THREADS);
+
 	Real host[BLOCKS * THREADS];
 	Real *dev;
 	curandState *devStates;
 
-	printf("# of trials per thread = %d, # of blocks = %d, # of threads/block = %d.\n", TRIALS_PER_THREAD,
+	printf("# of trials per thread = %d, # of blocks = %d, # of threads/block = %d.\n", trials_per_thread,
 BLOCKS, THREADS);
 
 	start = clock();
@@ -174,7 +176,7 @@ BLOCKS, THREADS);
 	
 	cudaMalloc( (void **)&devStates, THREADS * BLOCKS * sizeof(curandState) );
 
-	gpu_monte_carlo<<<BLOCKS, THREADS>>>(dev, devStates);
+	gpu_monte_carlo<<<BLOCKS, THREADS>>>(dev, devStates,trials_per_thread);
 
 	cudaMemcpy(host, dev, BLOCKS * THREADS * sizeof(Real), cudaMemcpyDeviceToHost); // return results 
 
@@ -187,13 +189,13 @@ BLOCKS, THREADS);
 
 	stop = clock();
 
-	#ifdef DP
-		printf("GPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+	// #ifdef DP
+	// 	printf("GPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
 
-	#else
-		printf("GPU pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+	// #else
+		printf("GPU pi calculated in %f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
 
-	#endif
+	// #endif
 	
 
 	// PThreads
@@ -216,20 +218,20 @@ BLOCKS, THREADS);
            
       pthread_join(threads[t], &status);
 	    tot_in+=*(double*)status;            //keep track of the total in count 
-      printf("tot_in IN LOOP: %lf\n", tot_in);  
+      // printf("tot_in IN LOOP: %lf\n", tot_in);  
      }
-   printf("tot_in : %lf\n", tot_in);
-   printf("total_tasks : %ld\n", total_tasks);  
+   // printf("tot_in : %lf\n", tot_in);
+   // printf("total_tasks : %ld\n", total_tasks);  
 
    Real pthread_pi=4*(tot_in/total_tasks);
    stop = clock();
-   #ifdef DP
-		printf("PThreads pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+ //   #ifdef DP
+	// 	printf("PThreads pi calculated in %20.18f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
 
-	#else
-		printf("PThreads pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+	// #else
+		printf("PThreads pi calculated in %f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
 
-	#endif
+	// #endif
    //End of PThreads 
 	
 
@@ -237,13 +239,13 @@ BLOCKS, THREADS);
 	Real pi_cpu = host_monte_carlo(total_tasks);
 	stop = clock();
 
-	#ifdef DP
-		printf("CPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+	// #ifdef DP
+	// 	printf("CPU pi calculated in %20.18f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
 
-	#else
-		printf("CPU pi calculated in %f s.\n", (stop-start)/(Real)CLOCKS_PER_SEC);
+	// #else
+		printf("CPU pi calculated in %f s.\n", (stop-start)/(float)CLOCKS_PER_SEC);
 
-	#endif
+	// #endif
 
 	
 	#ifdef DP
