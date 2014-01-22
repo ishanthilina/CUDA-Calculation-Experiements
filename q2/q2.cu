@@ -22,7 +22,7 @@
 // PThread related
 #define MAX_PTHREADS 8
 
-#define VECTOR_SIZE 100000000  //1e8
+#define VECTOR_SIZE 10000000  //1e8
 // #define VECTOR_SIZE 5  //1e8
 
 //Code to check for GPU errors
@@ -215,16 +215,34 @@ typedef float Real;
 
  	unsigned long start_point = threadIdx.x + blockDim.x * blockIdx.x;
 
+  // result=0;
+
 
 	// calculate the range to be multiplied
- 	long lowerbound=start_point*CALCS_PER_THREAD;
- 	
- 	long upperbound=lowerbound+CALCS_PER_THREAD-1;
+  long lowerbound=start_point*CALCS_PER_THREAD;
+
+  long upperbound=lowerbound+CALCS_PER_THREAD-1;
+
+  __shared__ Real cache[THREADS_PER_BLOCK] ;
+
+  // take the sum of the elements
+   if(threadIdx.x==0){
+      for(int count=0;count<THREADS_PER_BLOCK;count++){
+        cache[count]=0;
+      }
+      // printf("%d : %f\n",blockIdx.x,sum );
+      // result[blockIdx.x]=sum;
+   }
+
+__syncthreads();
+
+  Real sum=0;
+  
   // long i=0;
 	// printf("%ld - %ld - %ld \n", start_point,lowerbound,upperbound);
   for(long index=lowerbound;index<=upperbound;index++){
  		// printf("%ld - %ld - %ld - %ld\n", start_point,lowerbound,upperbound,index);
-    result[index] = vector1[index]*vector2[index];
+    sum += vector1[index]*vector2[index];
  		// result[1] = 13;
       // printf("%d - %f\n", threadIdx.x,result[index]);
     // i=index;
@@ -232,7 +250,23 @@ typedef float Real;
 
   }
 
+  // store the sum
+  cache[threadIdx.x] = sum;
 
+   __syncthreads();
+
+   sum=0;
+
+   // take the sum of the elements
+   if(threadIdx.x==0){
+      for(int count=0;count<THREADS_PER_BLOCK;count++){
+        sum += cache[count];
+      }
+      // printf("%d : %f\n",blockIdx.x,sum );
+      result[blockIdx.x]=sum;
+   }
+
+   
   // printf("%ld -- %ld ::  %f\n", start_point,i,result[i]);
 
  		// printf("2-Hello thread %d\n", threadIdx.x);
@@ -339,14 +373,9 @@ int main(int argc, char const *argv[])
 
          printStats();
 
-         Real* _results;
-         gpuErrchk(cudaMalloc((void**) &_results, size));
-         printStats();
          
 
-		// Allocate memory for results in the host memory
-    	// Real* results = (Real*)malloc(size);
-         static Real results[VECTOR_SIZE]; 
+		
 
 		//copy vectors from host memory to device memory
          cudaMemcpy(_vector1, vector1,size,cudaMemcpyHostToDevice);
@@ -356,6 +385,16 @@ int main(int argc, char const *argv[])
 
          long num_of_grids=(VECTOR_SIZE/(THREADS_PER_BLOCK*CALCS_PER_THREAD))+1;
          printf("#of Grids = %ld\n",num_of_grids );
+
+// Allocate memory for results in the host memory
+      // Real* results = (Real*)malloc(size);
+         Real results[num_of_grids]; 
+
+         Real* _results;
+         size_t result_size = sizeof(Real)*num_of_grids;
+         gpuErrchk(cudaMalloc((void**) &_results, result_size));
+         printStats();
+
 		// carry out the calculations
          cuda_thread_task\
          <<<num_of_grids,THREADS_PER_BLOCK>>>(_vector1,_vector2,_results);
@@ -364,7 +403,7 @@ int main(int argc, char const *argv[])
          // gpuErrchk( cudaDeviceSynchronize() );
 
 		// copy the results back from the device memory to host memory
-         cudaMemcpy(results,_results,size,cudaMemcpyDeviceToHost);
+         cudaMemcpy(results,_results, sizeof(Real)*num_of_grids,cudaMemcpyDeviceToHost);
 
 		// free device memory
          cudaFree(_vector1);
@@ -374,8 +413,9 @@ int main(int argc, char const *argv[])
 
 		// calculate the final result
          Real result=0;
-         for(long i=0;i<VECTOR_SIZE;i++){
+         for(long i=0;i<num_of_grids;i++){
           result+=results[i];
+          // printf("%f\n", results[i]);
     		// if(results[i]!=0.0){
     		// 	printf("%f\n",results[i] );
 
