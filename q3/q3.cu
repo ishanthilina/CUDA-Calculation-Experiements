@@ -451,6 +451,8 @@ int main(int argc, char const *argv[])
 		long matrix_size=MATRIX_DIM*MATRIX_DIM*sizeof(Real);
  			// printf("%ld\n",matrix_size );
 
+		GET_TIME(t1);
+		
 		Real* _A;
 		gpuErrchk(cudaMalloc((void**) &_A, matrix_size));
  		// printStats();
@@ -477,7 +479,7 @@ int main(int argc, char const *argv[])
 			dimGrid.x = (MATRIX_DIM + dimBlock.x - 1)/dimBlock.x;
 			dimGrid.y = (MATRIX_DIM + dimBlock.y - 1)/dimBlock.y;
 
-			GET_TIME(t1);
+			// GET_TIME(t1);
  			// execute the workload in the GPU
 			cuda_tiled_mat_mul<<<dimGrid , dimBlock>>>(_A,_B,_C);
 
@@ -522,7 +524,7 @@ int main(int argc, char const *argv[])
 			dim3 threadBlock(BLOCK_SIZE,BLOCK_SIZE);
 			dim3 grid(K,K);
 
-			GET_TIME(t1);
+			// GET_TIME(t1);
  			// call the GPU
 			cuda_simple_mat_mul<<<grid,threadBlock>>>(_A,_B,_C);
 
