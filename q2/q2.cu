@@ -22,7 +22,7 @@
 // PThread related
 #define MAX_PTHREADS 8
 
-#define VECTOR_SIZE 10000000  //1e8
+#define VECTOR_SIZE 10000000  //1e7
 // #define VECTOR_SIZE 5  //1e8
 
 //Code to check for GPU errors
