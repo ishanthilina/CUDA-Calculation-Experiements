@@ -1,6 +1,24 @@
-// clear;rm a.out; nvcc -O3 -D DP -L /usr/local/cuda/lib -lcuda -arch sm_30 q2.cu ;./a.out -c
-// 
-// clear;rm a.out; nvcc -O3 -L /usr/local/cuda/lib -lcuda q2.cu ;./a.out -c
+//How to run?
+//===========
+//
+//Single precision :
+//
+//nvcc -O3 q2.cu ; ./a.out -s
+//nvcc -O3 q2.cu ; ./a.out -p <thread_num>
+//nvcc -O3 q2.cu ; ./a.out -c
+//
+//with verification:
+//
+//nvcc -O3 q2.cu ; ./a.out -s -v
+//nvcc -O3 q2.cu ; ./a.out -p <thread_num> -v
+//nvcc -O3 q2.cu ; ./a.out -c -v
+//
+//Double precision: 
+//
+//Add -D DP flag. Ex-
+//
+//nvcc -O3 -D DP q2.cu ; ./a.out -p <thread_num>
+
 
 #include <stdlib.h>
 #include <stdio.h>

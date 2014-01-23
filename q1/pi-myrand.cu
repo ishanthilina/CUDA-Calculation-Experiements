@@ -2,6 +2,17 @@
 
 // Written by Barry Wilkinson, UNC-Charlotte. PiMyRandom.cu  December 22, 2010.
 //Derived somewhat from code developed by Patrick Rogers, UNC-C
+//
+////How to run?
+//===========
+//
+//Single precision :
+//
+//nvcc -O3 pi-myrand.cu ; ./a.out
+//
+//Double precision
+//
+//nvcc -O3 -D DP pi-myrand.cu ; ./a.out
 
 #include <stdlib.h>
 #include <stdio.h>

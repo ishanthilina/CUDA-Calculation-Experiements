@@ -2,6 +2,17 @@
 
 // Using CUDA device to calculate pi
 
+////How to run?
+//===========
+//
+//Single precision :
+//
+//nvcc -O3 pi-mystery.cu ; ./a.out
+//
+//Double precision
+//
+//nvcc -O3 -D DP pi-mystery.cu ; ./a.out
+
 #include <stdio.h>
 #include <cuda.h>
 

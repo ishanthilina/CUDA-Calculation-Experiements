@@ -8,11 +8,11 @@
 //
 //Single precision :
 //
-//nvcc -O3 pi-curand.cu ; ./a.out 4
+//nvcc -O3 pi-curand.cu ; ./a.out <thread_num>
 //
 //Double precision
 //
-//nvcc -O3 -D DP -arch sm_20 pi-curand.cu ; ./a.out 4
+//nvcc -O3 -D DP pi-curand.cu ; ./a.out <thread_num>
 
 #include <stdlib.h>
 #include <stdio.h>
