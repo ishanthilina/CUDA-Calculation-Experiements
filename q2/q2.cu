@@ -110,7 +110,8 @@ typedef float Real;
  */
  void initialize_vector(Real vector[]){
  	for(long i=0;i<VECTOR_SIZE;i++){
- 		vector[i]=(rand() / (float) RAND_MAX)+1;
+    vector[i]=(rand() / (float) RAND_MAX)+1;
+ 		// vector[i]=1.0f;
  	}
  }
 
@@ -223,20 +224,26 @@ typedef float Real;
 
   long upperbound=lowerbound+CALCS_PER_THREAD-1;
 
+  if(upperbound>=VECTOR_SIZE){
+    upperbound=VECTOR_SIZE-1;
+  }
+
   __shared__ Real cache[THREADS_PER_BLOCK] ;
 
+  __syncthreads();
+
   // take the sum of the elements
-   if(threadIdx.x==0){
-      for(int count=0;count<THREADS_PER_BLOCK;count++){
-        cache[count]=0;
-      }
+  if(threadIdx.x==0){
+    for(int count=0;count<THREADS_PER_BLOCK;count++){
+      cache[count]=0;
+    }
       // printf("%d : %f\n",blockIdx.x,sum );
       // result[blockIdx.x]=sum;
-   }
+  }
 
-__syncthreads();
+  __syncthreads();
 
-  Real sum=0;
+  Real sum=0.0f;
   
   // long i=0;
 	// printf("%ld - %ld - %ld \n", start_point,lowerbound,upperbound);
@@ -253,20 +260,20 @@ __syncthreads();
   // store the sum
   cache[threadIdx.x] = sum;
 
-   __syncthreads();
+  __syncthreads();
 
-   sum=0;
+  sum=0.0f;
 
    // take the sum of the elements
-   if(threadIdx.x==0){
-      for(int count=0;count<THREADS_PER_BLOCK;count++){
-        sum += cache[count];
-      }
+  if(threadIdx.x==0){
+    for(int count=0;count<THREADS_PER_BLOCK;count++){
+      sum += cache[count];
+    }
       // printf("%d : %f\n",blockIdx.x,sum );
-      result[blockIdx.x]=sum;
-   }
+    result[blockIdx.x]=sum;
+  }
 
-   
+
   // printf("%ld -- %ld ::  %f\n", start_point,i,result[i]);
 
  		// printf("2-Hello thread %d\n", threadIdx.x);
@@ -375,7 +382,7 @@ int main(int argc, char const *argv[])
 
          
 
-		
+
 
 		//copy vectors from host memory to device memory
          cudaMemcpy(_vector1, vector1,size,cudaMemcpyHostToDevice);
@@ -415,7 +422,7 @@ int main(int argc, char const *argv[])
          Real result=0;
          for(long i=0;i<num_of_grids;i++){
           result+=results[i];
-          // printf("%f\n", results[i]);
+          // printf("%ld --> %f\n",i, results[i]);
     		// if(results[i]!=0.0){
     		// 	printf("%f\n",results[i] );
 
