@@ -163,9 +163,9 @@ static unsigned long inMB(unsigned long bytes)
  */
  void print_product(Real pi, char *from){
 	#ifdef DP
- 	char *latter=" result is %20.18f\n";
+ 	char *latter=" result = %20.18f\n";
     #else
- 	char *latter=" result is %f\n";
+ 	char *latter=" result = %f\n";
     #endif
 
  	char *to_print = (char *)malloc(\
@@ -335,27 +335,28 @@ int main(int argc, char const *argv[])
 
 	// if a serial execution is needed
  if(0==strcmp(argv[1],"-s")){
-   printf("serial mode\n");
+   // printf("serial mode\n");
 
    GET_TIME(t1);
 
-		// printf("%f\n",serial_calculation(vector1,vector2) );
-   print_product(serial_calculation(vector1,vector2),"SERIAL");
+   Real result= serial_calculation(vector1,vector2);
+   
 
    GET_TIME(t2);
 
    comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
    printf("[SERIAL] N=%d: CPU Time(ms)=%.2f \n", VECTOR_SIZE, comp_time);
+   print_product(result,"[SERIAL]");
  }
 	// if a parallel execution is needed
  else if(0==strcmp(argv[1],"-p")){
-   print_product(serial_calculation(vector1,vector2),"SERIAL");
+   // print_product(serial_calculation(vector1,vector2),"SERIAL");
 
-   printf("parallel mode\n");
+   // printf("parallel mode\n");
 
    int num_of_threads;
 		// check whether the given # of threads is valid
-   if(argc !=3){
+   if(argc <3){
     print_usage();
     return -1;
   }
@@ -403,91 +404,124 @@ int main(int argc, char const *argv[])
 
           comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
           printf("[PTHREAD] N=%d: CPU Time(ms)=%.2f \n", VECTOR_SIZE, comp_time);
-          print_product(result,"PTHREADS");
+          print_product(result,"[PTHREADS]");
+
+
+// if verification needed
+          if(argc == 4 &&0==strcmp(argv[3],"-v")){
+            GET_TIME(t1);
+
+            Real result= serial_calculation(vector1,vector2);
+
+            GET_TIME(t2);
+
+            comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+            printf("[SERIAL] N=%d: CPU Time(ms)=%.2f \n", VECTOR_SIZE, comp_time);
+            print_product(result,"[SERIAL]");
+          }
 
         }
+
+        
+
+
 	// if CUDA execution is needed
         else if(0==strcmp(argv[1],"-c")){
-         print_product(serial_calculation(vector1,vector2),"SERIAL");
+         // print_product(serial_calculation(vector1,vector2),"SERIAL");
 
-         printf("cuda mode\n");
 
-         
+
+        // printf("cuda mode\n");
+
+
 
 		//Allocate vectors in device memory
          // printStats();
-         size_t size = VECTOR_SIZE * sizeof(Real);
-         Real* _vector1;
+          size_t size = VECTOR_SIZE * sizeof(Real);
+          Real* _vector1;
 
-         GET_TIME(t1);
+          GET_TIME(t1);
 
-         gpuErrchk(cudaMalloc((void**) &_vector1, size));
+          gpuErrchk(cudaMalloc((void**) &_vector1, size));
          // printStats();
 
-         Real* _vector2;
-         gpuErrchk(cudaMalloc((void**) &_vector2, size));
+          Real* _vector2;
+          gpuErrchk(cudaMalloc((void**) &_vector2, size));
 
          // printStats();
 
-         
+
 
 
 
 		//copy vectors from host memory to device memory
-         cudaMemcpy(_vector1, vector1,size,cudaMemcpyHostToDevice);
-         cudaMemcpy(_vector2, vector2,size,cudaMemcpyHostToDevice);
+          cudaMemcpy(_vector1, vector1,size,cudaMemcpyHostToDevice);
+          cudaMemcpy(_vector2, vector2,size,cudaMemcpyHostToDevice);
     	// cudaMemcpy(_results, results,size,cudaMemcpyHostToDevice);
 
 
-         long num_of_grids=(VECTOR_SIZE/(THREADS_PER_BLOCK*CALCS_PER_THREAD))+1;
-         printf("#of Grids = %ld\n",num_of_grids );
+          long num_of_grids=(VECTOR_SIZE/(THREADS_PER_BLOCK*CALCS_PER_THREAD))+1;
+        // printf("#of Grids = %ld\n",num_of_grids );
 
 // Allocate memory for results in the host memory
       // Real* results = (Real*)malloc(size);
-         Real results[num_of_grids]; 
+          Real results[num_of_grids]; 
 
-         Real* _results;
-         size_t result_size = sizeof(Real)*num_of_grids;
-         gpuErrchk(cudaMalloc((void**) &_results, result_size));
+          Real* _results;
+          size_t result_size = sizeof(Real)*num_of_grids;
+          gpuErrchk(cudaMalloc((void**) &_results, result_size));
          // printStats();
 
 		// carry out the calculations
-         cuda_thread_task\
-         <<<num_of_grids,THREADS_PER_BLOCK>>>(_vector1,_vector2,_results);
+          cuda_thread_task\
+          <<<num_of_grids,THREADS_PER_BLOCK>>>(_vector1,_vector2,_results);
 
          // gpuErrchk( cudaPeekAtLastError() );
          // gpuErrchk( cudaDeviceSynchronize() );
 
 		// copy the results back from the device memory to host memory
-         cudaMemcpy(results,_results, sizeof(Real)*num_of_grids,cudaMemcpyDeviceToHost);
+          cudaMemcpy(results,_results, sizeof(Real)*num_of_grids,cudaMemcpyDeviceToHost);
 
-         GET_TIME(t2);
+          GET_TIME(t2);
 
-         comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
-         printf("[CUDA] N=%d: CPU Time(ms)=%.2f \n", VECTOR_SIZE, comp_time);
+          comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+          printf("[CUDA] N=%d: CPU Time(ms)=%.2f \n", VECTOR_SIZE, comp_time);
 		// free device memory
-         cudaFree(_vector1);
-         cudaFree(_vector2);
-         cudaFree(_results);
+          cudaFree(_vector1);
+          cudaFree(_vector2);
+          cudaFree(_results);
 
 
 		// calculate the final result
-         Real result=0;
-         for(long i=0;i<num_of_grids;i++){
-          result+=results[i];
+          Real result=0;
+          for(long i=0;i<num_of_grids;i++){
+            result+=results[i];
           // printf("%ld --> %f\n",i, results[i]);
     		// if(results[i]!=0.0){
     		// 	printf("%f\n",results[i] );
 
     		// }
+          }
+
+          print_product(result,"[CUDA]");
+
+        // if verification needed
+          if(argc == 3 &&0==strcmp(argv[2],"-v")){
+            GET_TIME(t1);
+
+            Real result= serial_calculation(vector1,vector2);
+
+            GET_TIME(t2);
+
+            comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+            printf("[SERIAL] N=%d: CPU Time(ms)=%.2f \n", VECTOR_SIZE, comp_time);
+            print_product(result,"[SERIAL]");
+          }
+
+
         }
-
-        print_product(result,"CUDA");
-
-
-      }
-      else{
-       print_usage();
+        else{
+         print_usage();
+       }
+       return 0;
      }
-     return 0;
-   }
