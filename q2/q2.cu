@@ -1,9 +1,6 @@
 // clear;rm a.out; nvcc -O3 -D DP -L /usr/local/cuda/lib -lcuda -arch sm_30 q2.cu ;./a.out -c
 // 
 // clear;rm a.out; nvcc -O3 -L /usr/local/cuda/lib -lcuda q2.cu ;./a.out -c
-// 
-// 
-// http://stackoverflow.com/questions/14038589/what-is-the-canonical-way-to-check-for-errors-using-the-cuda-runtime-api
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -200,15 +197,10 @@ static unsigned long inMB(unsigned long bytes)
 	Real *result = (Real *)malloc(sizeof(Real));
 	*result=0;
 
-	// printf("%d\n",tid );
-	// print_vector(vector1);
-	// print_vector(vector2);
-
 	// calculate the range to be multiplied
 	int chunk_size = VECTOR_SIZE/total_threads;
 	int lowerbound=chunk_size*tid;			// lowest index to be calculated
 	int upperbound=lowerbound+chunk_size-1;	// highest index to be calculated
-	// printf("%d calculates from %d to %d\n",tid, lowerbound,upperbound );
 
 	for(int i=lowerbound;i<=upperbound;i++){
 		*result+=vector1[i]*vector2[i];
@@ -222,7 +214,6 @@ static unsigned long inMB(unsigned long bytes)
 
 	}
 
-	// printf("In the end thread %d total is %f\n",tid,*result );
    	pthread_exit((void *)result);     //return the in count
 
    }
@@ -239,9 +230,6 @@ static unsigned long inMB(unsigned long bytes)
 
 
  	unsigned long start_point = threadIdx.x + blockDim.x * blockIdx.x;
-
-  // result=0;
-
 
 	// calculate the range to be multiplied
   long lowerbound=start_point*CALCS_PER_THREAD;
@@ -261,24 +249,15 @@ static unsigned long inMB(unsigned long bytes)
     for(int count=0;count<THREADS_PER_BLOCK;count++){
       cache[count]=0;
     }
-      // printf("%d : %f\n",blockIdx.x,sum );
-      // result[blockIdx.x]=sum;
+
   }
 
   __syncthreads();
 
   Real sum=0.0f;
   
-  // long i=0;
-	// printf("%ld - %ld - %ld \n", start_point,lowerbound,upperbound);
   for(long index=lowerbound;index<=upperbound;index++){
- 		// printf("%ld - %ld - %ld - %ld\n", start_point,lowerbound,upperbound,index);
     sum += vector1[index]*vector2[index];
- 		// result[1] = 13;
-      // printf("%d - %f\n", threadIdx.x,result[index]);
-    // i=index;
- 		// vector1[index]=12;
-
   }
 
   // store the sum
@@ -293,17 +272,8 @@ static unsigned long inMB(unsigned long bytes)
     for(int count=0;count<THREADS_PER_BLOCK;count++){
       sum += cache[count];
     }
-      // printf("%d : %f\n",blockIdx.x,sum );
     result[blockIdx.x]=sum;
   }
-
-
-  // printf("%ld -- %ld ::  %f\n", start_point,i,result[i]);
-
- 		// printf("2-Hello thread %d\n", threadIdx.x);
- 	// result[start_point]=23;
-
-
 
 
 }
@@ -319,12 +289,10 @@ int main(int argc, char const *argv[])
   srand(time(NULL));
 
 	// check the inputs and set the mode
-	// int execution_mode=-1;
   if(argc<2){
    print_usage();
  }
 	// initialize the vectors
-	// printf("%d\n",VECTOR_SIZE);
  static Real vector1[VECTOR_SIZE];
  static Real vector2[VECTOR_SIZE];
  initialize_vector(vector1);
@@ -335,12 +303,10 @@ int main(int argc, char const *argv[])
 
 	// if a serial execution is needed
  if(0==strcmp(argv[1],"-s")){
-   // printf("serial mode\n");
 
    GET_TIME(t1);
 
    Real result= serial_calculation(vector1,vector2);
-   
 
    GET_TIME(t2);
 
@@ -350,9 +316,6 @@ int main(int argc, char const *argv[])
  }
 	// if a parallel execution is needed
  else if(0==strcmp(argv[1],"-p")){
-   // print_product(serial_calculation(vector1,vector2),"SERIAL");
-
-   // printf("parallel mode\n");
 
    int num_of_threads;
 		// check whether the given # of threads is valid
@@ -366,7 +329,6 @@ int main(int argc, char const *argv[])
     return -1;
   }
 
-		// printf("Creating %d threads\n", num_of_threads);
   pthread_t threads[num_of_threads];
   int rc;
   long t;
@@ -375,7 +337,7 @@ int main(int argc, char const *argv[])
 
   GET_TIME(t1);
 
-   		//initialize the threads
+  //initialize the threads
   for(t=0;t<num_of_threads;t++){
     struct pthread_arg_struct* args=(\
      struct pthread_arg_struct*)malloc(sizeof *args);
@@ -396,7 +358,6 @@ int main(int argc, char const *argv[])
  for(t=0;t<num_of_threads;t++){
   pthread_join(threads[t], &status);
             result+=*(Real*)status;            //keep track of the total in count
-            // printf("Thread: %ld %f\n",t,result );
 
           }
 
@@ -427,57 +388,35 @@ int main(int argc, char const *argv[])
 
 	// if CUDA execution is needed
         else if(0==strcmp(argv[1],"-c")){
-         // print_product(serial_calculation(vector1,vector2),"SERIAL");
-
-
-
-        // printf("cuda mode\n");
-
-
 
 		//Allocate vectors in device memory
-         // printStats();
           size_t size = VECTOR_SIZE * sizeof(Real);
           Real* _vector1;
 
           GET_TIME(t1);
 
           gpuErrchk(cudaMalloc((void**) &_vector1, size));
-         // printStats();
 
           Real* _vector2;
           gpuErrchk(cudaMalloc((void**) &_vector2, size));
 
-         // printStats();
-
-
-
-
-
 		//copy vectors from host memory to device memory
           cudaMemcpy(_vector1, vector1,size,cudaMemcpyHostToDevice);
           cudaMemcpy(_vector2, vector2,size,cudaMemcpyHostToDevice);
-    	// cudaMemcpy(_results, results,size,cudaMemcpyHostToDevice);
 
 
           long num_of_grids=(VECTOR_SIZE/(THREADS_PER_BLOCK*CALCS_PER_THREAD))+1;
-        // printf("#of Grids = %ld\n",num_of_grids );
 
 // Allocate memory for results in the host memory
-      // Real* results = (Real*)malloc(size);
           Real results[num_of_grids]; 
 
           Real* _results;
           size_t result_size = sizeof(Real)*num_of_grids;
           gpuErrchk(cudaMalloc((void**) &_results, result_size));
-         // printStats();
 
 		// carry out the calculations
           cuda_thread_task\
           <<<num_of_grids,THREADS_PER_BLOCK>>>(_vector1,_vector2,_results);
-
-         // gpuErrchk( cudaPeekAtLastError() );
-         // gpuErrchk( cudaDeviceSynchronize() );
 
 		// copy the results back from the device memory to host memory
           cudaMemcpy(results,_results, sizeof(Real)*num_of_grids,cudaMemcpyDeviceToHost);
@@ -496,9 +435,6 @@ int main(int argc, char const *argv[])
           Real result=0;
           for(long i=0;i<num_of_grids;i++){
             result+=results[i];
-          // printf("%ld --> %f\n",i, results[i]);
-    		// if(results[i]!=0.0){
-    		// 	printf("%f\n",results[i] );
 
     		// }
           }
