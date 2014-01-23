@@ -236,15 +236,15 @@ static unsigned long inMB(unsigned long bytes)
 
   long upperbound=lowerbound+CALCS_PER_THREAD-1;
 
+  // Don't try to calculate beyond vector size
   if(upperbound>=VECTOR_SIZE){
     upperbound=VECTOR_SIZE-1;
   }
 
   __shared__ Real cache[THREADS_PER_BLOCK] ;
 
-  __syncthreads();
 
-  // take the sum of the elements
+  // initialize the cache
   if(threadIdx.x==0){
     for(int count=0;count<THREADS_PER_BLOCK;count++){
       cache[count]=0;
@@ -252,7 +252,6 @@ static unsigned long inMB(unsigned long bytes)
 
   }
 
-  __syncthreads();
 
   Real sum=0.0f;
   
@@ -260,15 +259,20 @@ static unsigned long inMB(unsigned long bytes)
     sum += vector1[index]*vector2[index];
   }
 
+  // Wait till master has finished clearing the cache
+  __syncthreads();
+
   // store the sum
   cache[threadIdx.x] = sum;
 
-  __syncthreads();
-
   sum=0.0f;
+
+  // should wait till everyone has finished computing
+  __syncthreads();
 
    // take the sum of the elements
   if(threadIdx.x==0){
+    
     for(int count=0;count<THREADS_PER_BLOCK;count++){
       sum += cache[count];
     }
