@@ -13,7 +13,10 @@
 #include <curand_kernel.h>
 #include <pthread.h>
 #include <cuda_runtime_api.h>
+#include <errno.h>
 
+#define GET_TIME(x);  if (clock_gettime(CLOCK_MONOTONIC, &(x)) < 0) \
+{ perror("clock_gettime( ):"); exit(EXIT_FAILURE); }
 
 // CUDA related
 #define THREADS_PER_BLOCK 256
@@ -49,30 +52,51 @@ typedef float Real;
  	printf("Wrong usage!\n");
  }
 
- void print_vector(Real vector[]){
- 	printf("---------------------------------------------------------------\n");
- 	for(long i=0;i<VECTOR_SIZE;i++){
+/**
+ * Measures the time differences
+ * @param  begin begin time
+ * @param  end   end time
+ * @param  sec   resulting time in seconds
+ * @param  nsec  resulting time in nano-seconds
+ * @return       the time taken
+ */
+ float elapsed_time_msec(struct timespec *begin, struct timespec *end, long *sec, long *nsec)
+ {
+  if (end->tv_nsec < begin->tv_nsec) {
+    *nsec = 1000000000 - (begin->tv_nsec - end->tv_nsec);
+    *sec = end->tv_sec - begin->tv_sec -1;
+  }
+  else {
+    *nsec = end->tv_nsec - begin->tv_nsec;
+    *sec = end->tv_sec - begin->tv_sec;
+  }
+  return (float) (*sec) * 1000 + ((float) (*nsec)) / 1000000;
+}
+
+void print_vector(Real vector[]){
+  printf("---------------------------------------------------------------\n");
+  for(long i=0;i<VECTOR_SIZE;i++){
 		#ifdef DP
- 		printf("%ld --> %20.18f\n",i,vector[i]);
+   printf("%ld --> %20.18f\n",i,vector[i]);
 
         #else
- 		printf("%ld --> %f\n",i,vector[i]);
+   printf("%ld --> %f\n",i,vector[i]);
 
 
         #endif
- 	}
- 	printf("---------------------------------------------------------------\n");
  }
+ printf("---------------------------------------------------------------\n");
+}
 
- static unsigned long inKB(unsigned long bytes)
+static unsigned long inKB(unsigned long bytes)
 
- { return bytes/1024; }
+{ return bytes/1024; }
 
 
 
- static unsigned long inMB(unsigned long bytes)
+static unsigned long inMB(unsigned long bytes)
 
- { return bytes/(1024*1024); }
+{ return bytes/(1024*1024); }
 
 
 /**
@@ -112,8 +136,8 @@ typedef float Real;
  	for(long i=0;i<VECTOR_SIZE;i++){
     vector[i]=(rand() / (float) RAND_MAX)+1;
  		// vector[i]=1.0f;
- 	}
- }
+  }
+}
 
 /**
  * Does a serial calculation of the dot product of the two given vectors
@@ -286,6 +310,14 @@ typedef float Real;
 
 int main(int argc, char const *argv[])
 {
+
+  struct timespec t1, t2;
+  long sec, nsec;
+  float comp_time;  // in milli seconds
+
+  // Initialize the random seed
+  srand(time(NULL));
+
 	// check the inputs and set the mode
 	// int execution_mode=-1;
   if(argc<2){
@@ -304,8 +336,16 @@ int main(int argc, char const *argv[])
 	// if a serial execution is needed
  if(0==strcmp(argv[1],"-s")){
    printf("serial mode\n");
+
+   GET_TIME(t1);
+
 		// printf("%f\n",serial_calculation(vector1,vector2) );
    print_product(serial_calculation(vector1,vector2),"SERIAL");
+
+   GET_TIME(t2);
+
+   comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+   printf("[SERIAL] N=%d: CPU Time(ms)=%.2f \n", VECTOR_SIZE, comp_time);
  }
 	// if a parallel execution is needed
  else if(0==strcmp(argv[1],"-p")){
@@ -332,6 +372,8 @@ int main(int argc, char const *argv[])
   void *status;
   Real result=0;
 
+  GET_TIME(t1);
+
    		//initialize the threads
   for(t=0;t<num_of_threads;t++){
     struct pthread_arg_struct* args=(\
@@ -357,6 +399,10 @@ int main(int argc, char const *argv[])
 
           }
 
+          GET_TIME(t2);
+
+          comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+          printf("[PTHREAD] N=%d: CPU Time(ms)=%.2f \n", VECTOR_SIZE, comp_time);
           print_product(result,"PTHREADS");
 
         }
@@ -372,13 +418,16 @@ int main(int argc, char const *argv[])
          // printStats();
          size_t size = VECTOR_SIZE * sizeof(Real);
          Real* _vector1;
+
+         GET_TIME(t1);
+
          gpuErrchk(cudaMalloc((void**) &_vector1, size));
-         printStats();
+         // printStats();
 
          Real* _vector2;
          gpuErrchk(cudaMalloc((void**) &_vector2, size));
 
-         printStats();
+         // printStats();
 
          
 
@@ -400,7 +449,7 @@ int main(int argc, char const *argv[])
          Real* _results;
          size_t result_size = sizeof(Real)*num_of_grids;
          gpuErrchk(cudaMalloc((void**) &_results, result_size));
-         printStats();
+         // printStats();
 
 		// carry out the calculations
          cuda_thread_task\
@@ -412,6 +461,10 @@ int main(int argc, char const *argv[])
 		// copy the results back from the device memory to host memory
          cudaMemcpy(results,_results, sizeof(Real)*num_of_grids,cudaMemcpyDeviceToHost);
 
+         GET_TIME(t2);
+
+         comp_time = elapsed_time_msec(&t1, &t2, &sec, &nsec);
+         printf("[CUDA] N=%d: CPU Time(ms)=%.2f \n", VECTOR_SIZE, comp_time);
 		// free device memory
          cudaFree(_vector1);
          cudaFree(_vector2);
